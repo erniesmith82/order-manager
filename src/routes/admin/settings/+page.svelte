@@ -1,68 +1,102 @@
 <script>
-  import { onMount } from 'svelte';
-  import { logoutUser, getCurrentUser } from '$lib/auth';
-  import { goto } from '$app/navigation';
-
-  let darkMode = false;
-  let notifications = true;
-  let user;
-
-  onMount(() => {
-    user = getCurrentUser();
-    const storedTheme = localStorage.getItem('theme');
-    darkMode = storedTheme === 'dark';
-    updateTheme();
-  });
-
-  function toggleDarkMode() {
-    darkMode = !darkMode;
-    localStorage.setItem('theme', darkMode ? 'dark' : 'light');
-    updateTheme();
-  }
-
-  function updateTheme() {
-    if (darkMode) {
-      document.documentElement.classList.add('dark');
-    } else {
-      document.documentElement.classList.remove('dark');
-    }
-  }
-
-  function toggleNotifications() {
-    notifications = !notifications;
-    // Could store preference in localStorage or DB
-  }
-
-  function handleLogout() {
-    logoutUser();
-    goto('/login');
-  }
+	let autoRefresh = false;
+	let refreshInterval = 5;
+	let defaultStatus = 'pending';
+	let showCustomOrders = true;
+	let showPrefabOrders = true;
+	let exportFormat = 'csv';
+	let browserNotifications = {
+		newOrders: false,
+		messages: false,
+		errors: false
+	};
 </script>
 
-<div class="max-w-3xl mx-auto py-10 px-4">
-  <h1 class="text-2xl font-bold mb-6">Admin Settings</h1>
+<div class="bg-white text-gray-900 p-6 space-y-6">
+	<h1 class="text-2xl font-bold">Settings</h1>
 
-  <div class="space-y-6">
-    <div class="flex items-center justify-between">
-      <span class="font-medium">Dark Mode</span>
-      <label class="inline-flex items-center cursor-pointer">
-        <input type="checkbox" class="sr-only peer" bind:checked={darkMode} on:change={toggleDarkMode}>
-        <div class="w-11 h-6 bg-gray-200 peer-focus:outline-none peer-focus:ring-2 peer-focus:ring-blue-500 dark:bg-gray-700 rounded-full peer dark:peer-checked:bg-blue-600 peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-0.5 after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all"></div>
-      </label>
-    </div>
+	<!-- Contact Info -->
+	<div>
+		<h2 class="text-lg font-semibold">📧 Update Email or Contact Info</h2>
+		<input type="text" placeholder="Your email" class="mt-2 p-2 border rounded w-full" />
+	</div>
 
-    <div class="flex items-center justify-between">
-      <span class="font-medium">Enable Notifications</span>
-      <label class="inline-flex items-center cursor-pointer">
-        <input type="checkbox" class="sr-only peer" bind:checked={notifications} on:change={toggleNotifications}>
-        <div class="w-11 h-6 bg-gray-200 peer-focus:outline-none peer-focus:ring-2 peer-focus:ring-blue-500 dark:bg-gray-700 rounded-full peer dark:peer-checked:bg-blue-600 peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-0.5 after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all"></div>
-      </label>
-    </div>
+	<!-- Login History -->
+	<div>
+		<h2 class="text-lg font-semibold">📜 Login History or Active Sessions</h2>
+		<p class="text-sm text-gray-600">Coming soon: See your recent logins and devices.</p>
+	</div>
 
-    <div class="border-t pt-6">
-      <button on:click={handleLogout} class="bg-red-600 hover:bg-red-700 text-white px-4 py-2 rounded">
-        Logout
-      </button>
-    </div>
-  </div>
+	<!-- UI Scale -->
+	<div>
+		<h2 class="text-lg font-semibold">⏹ Font Size or UI Scale</h2>
+		<select class="mt-2 p-2 border rounded">
+			<option>Normal</option>
+			<option>Large</option>
+			<option>Extra Large</option>
+		</select>
+	</div>
+
+	<!-- Auto-Refresh Orders -->
+	<div>
+		<h2 class="text-lg font-semibold">🔄 Auto-refresh Orders</h2>
+		<label class="flex items-center space-x-2">
+			<input type="checkbox" bind:checked={autoRefresh} />
+			<span>Enable Auto-refresh</span>
+		</label>
+		{#if autoRefresh}
+			<input type="number" min="1" bind:value={refreshInterval} class="mt-2 p-2 border rounded w-24" />
+			<span class="ml-2 text-sm text-gray-600">minutes</span>
+		{/if}
+	</div>
+
+	<!-- Default Order Status Filter -->
+	<div>
+		<h2 class="text-lg font-semibold">✅ Default Order Status Filter</h2>
+		<select bind:value={defaultStatus} class="mt-2 p-2 border rounded">
+			<option value="pending">Pending</option>
+			<option value="in_progress">In Progress</option>
+			<option value="complete">Complete</option>
+		</select>
+	</div>
+
+	<!-- Order Type Visibility -->
+	<div>
+		<h2 class="text-lg font-semibold">📦 Order Type Preferences</h2>
+		<label class="block">
+			<input type="checkbox" bind:checked={showCustomOrders} /> Show Custom Orders
+		</label>
+		<label class="block">
+			<input type="checkbox" bind:checked={showPrefabOrders} /> Show Prefab Orders
+		</label>
+	</div>
+
+	<!-- Export Format -->
+	<div>
+		<h2 class="text-lg font-semibold">📋 Default Export Format</h2>
+		<select bind:value={exportFormat} class="mt-2 p-2 border rounded">
+			<option value="csv">CSV</option>
+			<option value="pdf">PDF</option>
+		</select>
+	</div>
+
+	<!-- Browser Notifications -->
+	<div>
+		<h2 class="text-lg font-semibold">🔔 Browser Notifications</h2>
+		<label class="block">
+			<input type="checkbox" bind:checked={browserNotifications.newOrders} /> New Orders
+		</label>
+		<label class="block">
+			<input type="checkbox" bind:checked={browserNotifications.messages} /> Customer Messages
+		</label>
+		<label class="block">
+			<input type="checkbox" bind:checked={browserNotifications.errors} /> Errors or Alerts
+		</label>
+	</div>
+
+	<!-- Email Notifications -->
+	<div>
+		<h2 class="text-lg font-semibold">📩 Email Notification Preferences</h2>
+		<p class="text-sm text-gray-600">Coming soon: Customize what emails you'd like to receive.</p>
+	</div>
 </div>

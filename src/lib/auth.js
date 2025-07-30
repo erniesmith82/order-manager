@@ -1,11 +1,22 @@
-export const fakeUsers = [
-  { username: 'admin', password: 'admin123', role: 'admin' },
-  { username: 'jane', password: 'customer123', role: 'customer' }
-];
+// src/lib/auth.js
 
-export function loginUser(username, password) {
-  const user = fakeUsers.find(
-    (u) => u.username === username && u.password === password
+let cachedUsers = null;
+
+export async function loadUsers() {
+  if (cachedUsers) return cachedUsers;
+
+  const res = await fetch('/data/users.json');
+  if (!res.ok) throw new Error('Failed to load users');
+
+  cachedUsers = await res.json();
+  return cachedUsers;
+}
+
+export async function loginUser(email, password) {
+  const users = await loadUsers();
+
+  const user = users.find(
+    (u) => u.email === email && u.password === password
   );
 
   if (user) {

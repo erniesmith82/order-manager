@@ -1,0 +1,26 @@
+[
+  {
+    "id": "user-001",
+    "email": "admin@example.com",
+    "password": "admin123",  
+    "role": "admin",
+    "name": "Ernie Smith",
+    "avatar": "/avatars/ernie.png",
+    "preferences": {
+      "notifications": true,
+      "defaultExport": "PDF"
+    }
+  },
+  {
+    "id": "user-002",
+    "email": "staff@example.com",
+    "password": "hashed-password",
+    "role": "employee",
+    "name": "Jane Doe",
+    "avatar": "/avatars/jane.jpg",
+    "preferences": {
+      "notifications": false,
+      "defaultExport": "CSV"
+    }
+  }
+]
