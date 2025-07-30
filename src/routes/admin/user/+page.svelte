@@ -40,11 +40,8 @@
 
     <div>
       <label class="block text-sm font-medium text-gray-700">Avatar URL</label>
-      <input
-        class="w-full mt-1 p-2 border rounded"
-        type="text"
-        bind:value={user.avatar}
-      />
+      <input type="file" accept="image/*" on:change={handleAvatarUpload} />
+
     </div>
 
     <div>

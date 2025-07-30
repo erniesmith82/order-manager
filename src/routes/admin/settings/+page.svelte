@@ -19,7 +19,7 @@
   }
 </script>
 
-<div class="bg-white text-gray-900 p-6 space-y-6">
+<div class="bg-white text-gray-900 p-4 space-y-3 max-w-4xl mx-auto">
   <h1 class="text-2xl font-bold">Settings</h1>
 
   <!-- Update Info -->

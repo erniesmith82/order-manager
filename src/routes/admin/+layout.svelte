@@ -2,10 +2,10 @@
   import { logoutUser, getCurrentUser } from '$lib/auth';
   import { goto } from '$app/navigation';
 
-    const user = {
-    name: 'Jane Doe',
-    avatar: '/default-avatar.jpg' // Or use something like: 'https://i.pravatar.cc/100'
-  };
+
+
+const user = getCurrentUser();
+
   let sidebarOpen = false;
 
   function handleLogout() {
@@ -52,16 +52,13 @@
       </div>
 
       <!-- User Info -->
-      {#if user}
-        <div class="flex flex-col items-center mb-20 mx-0 space-y-2">
-          <img
-            src={user.avatar ?? '/default-avatar.png'}
-            alt="User Avatar"
-            class="w-16 h-16 rounded-full border-2 border-gray-600"
-          />
-          <span class="text-sm font-semibold">{user.name ?? 'Admin User'}</span>
-        </div>
-      {/if}
+     {#if user}
+  <div class="text-center mb-6">
+    <img src={user.avatar} alt="User Avatar" class="w-16 h-16 rounded-full mx-auto border-2 border-white shadow" />
+    <p class="mt-2 font-medium">{user.name}</p>
+  </div>
+{/if}
+
 
       <!-- Navigation Links -->
       <ul class="space-y-4 font-medium">

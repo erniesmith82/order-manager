@@ -5,7 +5,7 @@
     "password": "admin123",  
     "role": "admin",
     "name": "Ernie Smith",
-    "avatar": "/avatars/ernie.png",
+    "avatar": "/uploads/avatars/user-001.png",
     "preferences": {
       "notifications": true,
       "defaultExport": "PDF"
