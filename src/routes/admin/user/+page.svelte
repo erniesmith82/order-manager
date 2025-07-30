@@ -1,57 +1,70 @@
-<!-- src/routes/admin/user/+page.svelte -->
 <script>
+  import { getCurrentUser } from '$lib/auth';
   import { onMount } from 'svelte';
-  import { page } from '$app/stores';
+  import { goto } from '$app/navigation';
 
-  let userInfo = {
-    name: 'Admin User',
-    email: 'admin@example.com',
-    role: 'Administrator'
-  };
+  let user = null;
 
-  // You could fetch this info from an API onMount or load function
-  onMount(() => {
-    // fetchUserInfo();
+  onMount(async () => {
+    user = getCurrentUser();
+    if (!user) goto('/login');
   });
+
+  function saveChanges() {
+    localStorage.setItem('user', JSON.stringify(user));
+    alert('Profile updated!');
+  }
 </script>
 
-<div class="p-6 bg-white dark:bg-gray-900 min-h-screen text-gray-800 dark:text-white">
-  <h1 class="text-2xl font-bold mb-4">Admin Profile</h1>
+{#if user}
+  <div class="max-w-2xl mx-auto bg-white p-6 rounded shadow space-y-6">
+    <h1 class="text-2xl font-bold text-gray-800">Profile Settings</h1>
 
-  <div class="space-y-4">
     <div>
-      <label class="block text-sm font-medium">Full Name</label>
+      <label class="block text-sm font-medium text-gray-700">Name</label>
       <input
+        class="w-full mt-1 p-2 border rounded"
         type="text"
-        class="mt-1 block w-full p-2 bg-gray-100 dark:bg-gray-800 rounded"
-        bind:value={userInfo.name}
-        disabled
+        bind:value={user.name}
       />
     </div>
 
     <div>
-      <label class="block text-sm font-medium">Email</label>
+      <label class="block text-sm font-medium text-gray-700">Email</label>
       <input
+        class="w-full mt-1 p-2 border rounded"
         type="email"
-        class="mt-1 block w-full p-2 bg-gray-100 dark:bg-gray-800 rounded"
-        bind:value={userInfo.email}
-        disabled
+        bind:value={user.email}
       />
     </div>
 
     <div>
-      <label class="block text-sm font-medium">Role</label>
+      <label class="block text-sm font-medium text-gray-700">Avatar URL</label>
       <input
+        class="w-full mt-1 p-2 border rounded"
         type="text"
-        class="mt-1 block w-full p-2 bg-gray-100 dark:bg-gray-800 rounded"
-        bind:value={userInfo.role}
-        disabled
+        bind:value={user.avatar}
       />
     </div>
-  </div>
 
-  <div class="mt-8">
-    <button class="bg-blue-600 text-white px-4 py-2 rounded hover:bg-blue-700">Edit Profile</button>
-    <button class="ml-4 bg-red-600 text-white px-4 py-2 rounded hover:bg-red-700">Reset Password</button>
+    <div>
+      <label class="block text-sm font-medium text-gray-700">Default Export</label>
+      <select bind:value={user.preferences.defaultExport} class="w-full mt-1 p-2 border rounded">
+        <option value="PDF">PDF</option>
+        <option value="CSV">CSV</option>
+      </select>
+    </div>
+
+    <div class="flex items-center">
+      <input id="notifications" type="checkbox" bind:checked={user.preferences.notifications} class="mr-2" />
+      <label for="notifications" class="text-sm text-gray-700">Enable Notifications</label>
+    </div>
+
+    <button
+      class="bg-blue-600 hover:bg-blue-700 text-white py-2 px-4 rounded"
+      on:click={saveChanges}
+    >
+      Save Changes
+    </button>
   </div>
-</div>
+{/if}
