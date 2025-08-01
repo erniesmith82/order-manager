@@ -1,12 +1,20 @@
 <script>
   import { logoutUser, getCurrentUser } from '$lib/auth';
   import { goto } from '$app/navigation';
+  import { onMount } from 'svelte';
 
-
-
-const user = getCurrentUser();
-
+  let user = null;
   let sidebarOpen = false;
+
+  onMount(() => {
+    user = getCurrentUser();
+
+    // Protect this layout: only allow customers
+    if (!user || user.role !== 'customer') {
+      logoutUser();
+      goto('/login');
+    }
+  });
 
   function handleLogout() {
     logoutUser();
@@ -17,6 +25,7 @@ const user = getCurrentUser();
     sidebarOpen = !sidebarOpen;
   }
 </script>
+
 
 <!-- Mobile Top Bar -->
 <div class="sm:hidden flex justify-between items-center p-4 bg-white shadow fixed top-0 left-0 right-0 z-50">
@@ -62,13 +71,10 @@ const user = getCurrentUser();
 
       <!-- Navigation Links -->
       <ul class="space-y-4 mx-5 font-medium">
-        <li><a href="/admin/dashboard" class="block p-2 rounded-lg hover:bg-gray-800">Dashboard</a></li>
-        <li><a href="/admin/ProductionQueue" class="block p-2 rounded-lg hover:bg-gray-800">Production Queue</a></li>
-        <li><a href="/admin/orders" class="block p-2 rounded-lg hover:bg-gray-800">Orders</a></li>
-        <li><a href="/admin/Products" class="block p-2 rounded-lg hover:bg-gray-800">Products</a></li>
-        <li><a href="/admin/customers" class="block p-2 rounded-lg hover:bg-gray-800">Customers</a></li>
-        <li><a href="/admin/ProductionReport" class="block p-2 rounded-lg hover:bg-gray-800">Production Report</a></li>
-        <li><a href="/admin/Messages" class="block p-2 rounded-lg hover:bg-gray-800">Messages</a></li>
+        <li><a href="/customers/dashboard" class="block p-2 rounded-lg hover:bg-gray-800">Dashboard</a></li>
+        <li><a href="/customers/orders" class="block p-2 rounded-lg hover:bg-gray-800">Orders</a></li>
+        <li><a href="/customers/products" class="block p-2 rounded-lg hover:bg-gray-800">Products</a></li>
+        <li><a href="/customers/messages" class="block p-2 rounded-lg hover:bg-gray-800">Messages</a></li>
       </ul>
     </div>
 

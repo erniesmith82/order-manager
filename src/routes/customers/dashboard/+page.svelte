@@ -15,7 +15,7 @@
 
 {#if user}
 <div class="p-4 bg-gray-200">
-  <h1 class="text-2xl font-bold text-gray-800 mb-4">Admin Dashboard</h1>
+  <h1 class="text-2xl font-bold text-gray-800 mb-4">Customer Dashboard</h1>
   <p class="text-black">Welcome back! Here's a quick overview of your orders and activity.</p>
 
   <!-- Placeholder widgets or data -->

@@ -1,12 +1,20 @@
 <script>
   import { logoutUser, getCurrentUser } from '$lib/auth';
   import { goto } from '$app/navigation';
+  import { onMount } from 'svelte';
 
-
-
-const user = getCurrentUser();
-
+  let user = null;
   let sidebarOpen = false;
+
+  onMount(() => {
+    user = getCurrentUser();
+
+    // Protect this layout: only allow customers
+    if (!user || user.role !== 'admin') {
+      logoutUser();
+      goto('/login');
+    }
+  });
 
   function handleLogout() {
     logoutUser();
