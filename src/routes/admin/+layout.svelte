@@ -53,7 +53,7 @@ const user = getCurrentUser();
 
       <!-- User Info -->
      {#if user}
-  <div class="text-center mb-6">
+  <div class="text-center mb-20">
     <img src={user.avatar} alt="User Avatar" class="w-16 h-16 rounded-full mx-auto border-2 border-white shadow" />
     <p class="mt-2 font-medium">{user.name}</p>
   </div>
@@ -61,7 +61,7 @@ const user = getCurrentUser();
 
 
       <!-- Navigation Links -->
-      <ul class="space-y-4 font-medium">
+      <ul class="space-y-4 mx-5 font-medium">
         <li><a href="/admin/dashboard" class="block p-2 rounded-lg hover:bg-gray-800">Dashboard</a></li>
         <li><a href="/admin/ProductionQueue" class="block p-2 rounded-lg hover:bg-gray-800">Production Queue</a></li>
         <li><a href="/admin/orders" class="block p-2 rounded-lg hover:bg-gray-800">Orders</a></li>

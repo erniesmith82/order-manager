@@ -5,7 +5,7 @@
     "password": "admin123",
     "role": "admin",
     "name": "Ernie Smith",
-    "avatar": "/uploads/avatars/pxfuel-(2023_11_15-04_04_28-UTC).jpg",
+    "avatar": "/uploads/avatars/user-001.png",
     "preferences": {
       "notifications": true,
       "defaultExport": "PDF"
@@ -21,18 +21,6 @@
     "preferences": {
       "notifications": false,
       "defaultExport": "CSV"
-    }
-  },
-  {
-    "id": "user-1754016209099",
-    "name": "customer",
-    "email": "customer@example.com",
-    "password": "customer123",
-    "role": "customer",
-    "avatar": "/uploads/avatars/default.png",
-    "preferences": {
-      "notifications": true,
-      "defaultExport": "PDF"
     }
   }
 ]

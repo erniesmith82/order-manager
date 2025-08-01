@@ -5,15 +5,48 @@
 
   let user = null;
 
-  onMount(async () => {
+  onMount(() => {
     user = getCurrentUser();
     if (!user) goto('/login');
   });
 
-  function saveChanges() {
-    localStorage.setItem('user', JSON.stringify(user));
-    alert('Profile updated!');
+  async function handleAvatarUpload(event) {
+    const file = event.target.files[0];
+    if (!file) return;
+
+    const formData = new FormData();
+    formData.append('avatar', file);
+
+    const res = await fetch('/api/upload/avatar', {
+      method: 'POST',
+      body: formData
+    });
+
+    const result = await res.json();
+    if (result.avatar) {
+      user.avatar = result.avatar;
+    } else {
+      alert('Failed to upload avatar');
+    }
   }
+
+  async function saveChanges() {
+  const res = await fetch('/api/users/update', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(user)
+  });
+
+  const result = await res.json();
+
+  if (result.success) {
+    localStorage.setItem('user', JSON.stringify(result.user));
+    alert('Profile updated!');
+  } else {
+    alert('Failed to update profile: ' + (result.error || 'Unknown error'));
+  }
+}
+
 </script>
 
 {#if user}
@@ -38,11 +71,17 @@
       />
     </div>
 
-    <div>
-      <label class="block text-sm font-medium text-gray-700">Avatar URL</label>
-      <input type="file" accept="image/*" on:change={handleAvatarUpload} />
+   <div>
+  <label class="block text-sm font-medium text-gray-700">Avatar</label>
 
-    </div>
+  <!-- Show preview if available -->
+  {#if user.avatar}
+    <img src={user.avatar} alt="Avatar Preview" class="w-16 h-16 rounded-full mt-2" />
+  {/if}
+
+  <input type="file" accept="image/*" on:change={handleAvatarUpload} class="mt-2" />
+</div>
+
 
     <div>
       <label class="block text-sm font-medium text-gray-700">Default Export</label>

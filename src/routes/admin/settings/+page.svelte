@@ -1,5 +1,5 @@
 <script>
-  import UserProfileForm from '../user/+page.svelte'; // or make it a reusable component if needed
+  import UserProfileForm from '../user/+page.svelte';
 
   let showUpdateInfo = false;
   let autoRefresh = false;
@@ -19,106 +19,112 @@
   }
 </script>
 
-<div class="bg-white text-gray-900 p-4 space-y-3 max-w-4xl mx-auto">
-  <h1 class="text-2xl font-bold">Settings</h1>
+<div class="bg-white text-gray-900 p-6 space-y-10 max-w-4xl mx-auto rounded-md shadow-sm">
+  <h1 class="text-3xl font-bold border-b pb-2">User Settings</h1>
 
   <!-- Update Info -->
-  <div>
-    <h2 class="text-lg font-semibold cursor-pointer" on:click={() => showUpdateInfo = !showUpdateInfo}>
-      🧑‍💼 Update Info {showUpdateInfo ? '▲' : '▼'}
-    </h2>
-
+  <section class="space-y-4">
+    <div class="flex justify-between items-center cursor-pointer" on:click={() => showUpdateInfo = !showUpdateInfo}>
+      <h2 class="text-xl font-semibold">Update Profile Information</h2>
+      <span class="text-sm text-gray-600">{showUpdateInfo ? 'Collapse ▲' : 'Expand ▼'}</span>
+    </div>
     {#if showUpdateInfo}
-      <div class="mt-4 border p-4 rounded bg-gray-50">
+      <div class="p-4 bg-gray-50 border rounded-md space-y-4">
         <UserProfileForm />
-        <button
-          on:click={saveUserSettings}
-          class="mt-4 bg-blue-600 text-white px-4 py-2 rounded hover:bg-blue-700"
-        >
-          Save & Collapse
-        </button>
+        <div class="text-right">
+          <button
+            on:click={saveUserSettings}
+            class="mt-2 bg-blue-600 text-white px-4 py-2 rounded hover:bg-blue-700"
+          >
+            Save & Collapse
+          </button>
+        </div>
       </div>
     {/if}
-  </div>
-
-
+  </section>
 
   <!-- Login History -->
-  <div>
-    <h2 class="text-lg font-semibold">📜 Login History or Active Sessions</h2>
-    <p class="text-sm text-gray-600">Coming soon: See your recent logins and devices.</p>
-  </div>
+  <section>
+    <h2 class="text-xl font-semibold">Login History & Active Sessions</h2>
+    <p class="text-sm text-gray-500 mt-1">Coming soon: View your recent logins and connected devices.</p>
+  </section>
 
-  <!-- UI Scale -->
-  <div>
-    <h2 class="text-lg font-semibold">⏹ Font Size or UI Scale</h2>
-    <select class="mt-2 p-2 border rounded">
-      <option>Normal</option>
-      <option>Large</option>
-      <option>Extra Large</option>
-    </select>
-  </div>
-
-  <!-- Auto-Refresh Orders -->
-  <div>
-    <h2 class="text-lg font-semibold">🔄 Auto-refresh Orders</h2>
-    <label class="flex items-center space-x-2">
+  <!-- Auto-Refresh -->
+  <section>
+    <h2 class="text-xl font-semibold">Order Auto-Refresh</h2>
+    <div class="flex items-center gap-2 mt-2">
       <input type="checkbox" bind:checked={autoRefresh} />
-      <span>Enable Auto-refresh</span>
-    </label>
+      <label class="text-sm">Enable auto-refresh</label>
+    </div>
     {#if autoRefresh}
-      <input type="number" min="1" bind:value={refreshInterval} class="mt-2 p-2 border rounded w-24" />
-      <span class="ml-2 text-sm text-gray-600">minutes</span>
+      <div class="flex items-center gap-2 mt-2">
+        <input
+          type="number"
+          min="1"
+          bind:value={refreshInterval}
+          class="p-2 border rounded w-20"
+        />
+        <span class="text-sm text-gray-500">Minutes</span>
+      </div>
     {/if}
-  </div>
+  </section>
 
-  <!-- Default Order Status Filter -->
-  <div>
-    <h2 class="text-lg font-semibold">✅ Default Order Status Filter</h2>
-    <select bind:value={defaultStatus} class="mt-2 p-2 border rounded">
+  <!-- Default Order Status -->
+  <section>
+    <h2 class="text-xl font-semibold">Default Order Status</h2>
+    <select bind:value={defaultStatus} class="mt-2 p-2 border rounded w-full max-w-sm">
       <option value="pending">Pending</option>
       <option value="in_progress">In Progress</option>
       <option value="complete">Complete</option>
     </select>
-  </div>
+  </section>
 
-  <!-- Order Type Visibility -->
-  <div>
-    <h2 class="text-lg font-semibold">📦 Order Type Preferences</h2>
-    <label class="block">
-      <input type="checkbox" bind:checked={showCustomOrders} /> Show Custom Orders
-    </label>
-    <label class="block">
-      <input type="checkbox" bind:checked={showPrefabOrders} /> Show Prefab Orders
-    </label>
-  </div>
+  <!-- Order Type Preferences -->
+  <section>
+    <h2 class="text-xl font-semibold">Visible Order Types</h2>
+    <div class="space-y-2 mt-2">
+      <label class="flex items-center gap-2">
+        <input type="checkbox" bind:checked={showCustomOrders} />
+        <span>Show Custom Orders</span>
+      </label>
+      <label class="flex items-center gap-2">
+        <input type="checkbox" bind:checked={showPrefabOrders} />
+        <span>Show Prefab Orders</span>
+      </label>
+    </div>
+  </section>
 
   <!-- Export Format -->
-  <div>
-    <h2 class="text-lg font-semibold">📋 Default Export Format</h2>
-    <select bind:value={exportFormat} class="mt-2 p-2 border rounded">
+  <section>
+    <h2 class="text-xl font-semibold">Default Export Format</h2>
+    <select bind:value={exportFormat} class="mt-2 p-2 border rounded w-full max-w-sm">
       <option value="csv">CSV</option>
       <option value="pdf">PDF</option>
     </select>
-  </div>
+  </section>
 
   <!-- Browser Notifications -->
-  <div>
-    <h2 class="text-lg font-semibold">🔔 Browser Notifications</h2>
-    <label class="block">
-      <input type="checkbox" bind:checked={browserNotifications.newOrders} /> New Orders
-    </label>
-    <label class="block">
-      <input type="checkbox" bind:checked={browserNotifications.messages} /> Customer Messages
-    </label>
-    <label class="block">
-      <input type="checkbox" bind:checked={browserNotifications.errors} /> Errors or Alerts
-    </label>
-  </div>
+  <section>
+    <h2 class="text-xl font-semibold">Browser Notifications</h2>
+    <div class="space-y-2 mt-2">
+      <label class="flex items-center gap-2">
+        <input type="checkbox" bind:checked={browserNotifications.newOrders} />
+        <span>New Orders</span>
+      </label>
+      <label class="flex items-center gap-2">
+        <input type="checkbox" bind:checked={browserNotifications.messages} />
+        <span>Customer Messages</span>
+      </label>
+      <label class="flex items-center gap-2">
+        <input type="checkbox" bind:checked={browserNotifications.errors} />
+        <span>Errors & Alerts</span>
+      </label>
+    </div>
+  </section>
 
   <!-- Email Notifications -->
-  <div>
-    <h2 class="text-lg font-semibold">📩 Email Notification Preferences</h2>
-    <p class="text-sm text-gray-600">Coming soon: Customize what emails you'd like to receive.</p>
-  </div>
+  <section>
+    <h2 class="text-xl font-semibold">Email Preferences</h2>
+    <p class="text-sm text-gray-500 mt-1">Coming soon: Choose which email alerts you receive.</p>
+  </section>
 </div>
