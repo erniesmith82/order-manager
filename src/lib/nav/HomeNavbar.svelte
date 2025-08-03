@@ -1,7 +1,7 @@
 <script>
   let isOpen = false;
 </script>
-
+<div class="no-print">
 <nav class="bg-gray-900 text-white border-b border-gray-800 shadow-sm">
   <div class="max-w-screen-xl mx-auto px-4 sm:px-6 lg:px-8">
     <div class="flex justify-between h-20 items-center">
@@ -37,3 +37,4 @@
     </div>
   {/if}
 </nav>
+</div>

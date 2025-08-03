@@ -25,8 +25,70 @@
     sidebarOpen = !sidebarOpen;
   }
 </script>
+<style global>
+@media print {
+  .no-print,
+  aside,
+  nav,
+  .sidebar,
+  .layout-nav,
+  #admin-sidebar {
+    display: none !important;
+    visibility: hidden !important;
+  }
+
+    body {
+      margin: 0;
+      padding: 0;
+    }
+
+    body * {
+      visibility: hidden;
+    }
+
+    .no-print,
+    aside,
+    nav,
+    .sidebar,
+    .layout-nav {
+      display: none !important;
+      visibility: hidden !important;
+    }
+
+    #print-area,
+    #print-area * {
+      visibility: visible;
+    }
+
+    #print-area {
+      width: 8.5in;
+      padding: 0.5in;
+      box-sizing: border-box;
+      background: white;
+    }
+
+    main {
+      width: 100% !important;
+      margin: 0 auto !important;
+    }
+
+    input, textarea, select {
+      border: none !important;
+      border-bottom: 1px solid black !important;
+      background: transparent !important;
+      font-weight: bold !important;
+    }
+
+    img {
+      max-width: 100%;
+      height: auto;
+    }
+  }
+</style>
 
 
+
+<div class="no-print">
 <!-- Mobile Top Bar -->
 <div class="sm:hidden flex justify-between items-center p-4 bg-white shadow fixed top-0 left-0 right-0 z-50">
   <button on:click={toggleSidebar} class="text-gray-700 focus:outline-none">
@@ -80,7 +142,7 @@
 
     <!-- Settings + Logout -->
     <div class="mt-auto space-y-2 pt-6 border-t border-gray-700">
-      <a href="/admin/settings" class="block p-2 rounded-lg hover:bg-gray-800 w-full text-left text-white">
+      <a href="/customers/settings" class="block p-2 rounded-lg hover:bg-gray-800 w-full text-left text-white">
         Settings
       </a>
       <button on:click={handleLogout} class="block p-2 rounded-lg hover:bg-red-600 w-full text-left">
@@ -89,10 +151,12 @@
     </div>
   </div>
 </aside>
+</div>
 
 <!-- Page Content -->
+
 <div class="pt-16 p-4 sm:ml-64">
-  <main class="p-4 bg-gray-50 min-h-screen rounded-lg">
+  <main class="p-4min-h-screen rounded-lg">
     <slot />
   </main>
 </div>

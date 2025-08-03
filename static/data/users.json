@@ -25,7 +25,7 @@
   },
   {
     "id": "user-1754016209099",
-    "name": "customer",
+    "name": "Customer John",
     "email": "customer@example.com",
     "password": "customer123",
     "role": "customer",
