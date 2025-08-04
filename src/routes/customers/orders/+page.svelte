@@ -65,7 +65,7 @@
 
   <!-- New Order Tab -->
   {#if activeTab === 'new'}
-    <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6 max-w-6xl">
+    <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6 max-w-6xl mx-auto">
       {#each orderSections as section}
         <a href={section.link} class="group block border border-gray-300 rounded-lg shadow-sm hover:shadow-md transition bg-white overflow-hidden">
           <div class="relative">

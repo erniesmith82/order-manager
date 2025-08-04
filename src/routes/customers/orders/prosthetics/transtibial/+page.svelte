@@ -5,9 +5,32 @@
     sex: '', activity: '', side: '', email: '', phone: ''
   };
 
-  let order = {
-    shipping: '', neededDate: '', receivedDate: '', workorder: ''
-  };
+let now = new Date();
+let todayFormatted = `${String(now.getMonth() + 1).padStart(2, '0')}/${String(now.getDate()).padStart(2, '0')}/${now.getFullYear()}`;
+let today = now.toISOString().split('T')[0]; 
+
+let order = {
+  shipping: '',
+  neededDate: '',
+  receivedDate: todayFormatted, // US MM/DD/YYYY display format
+  workorder: ''
+};
+
+let errors = {
+  name: false,
+  practitioner: false,
+  email: false,
+  phone: false,
+  activity: false,
+  side: false,
+  shipping: false,
+  neededDate: false,
+  receivedDate: false,
+  file: false
+};
+
+  let uploadedFile = null;
+
 
   let liner = { type: '', size: '', thickness: '' };
   let foot = { type: '', size: '' };
@@ -24,38 +47,52 @@
     () => patient.age.trim(),
     () => order.shipping.trim(),
     () => order.neededDate.trim(),
-    () => order.receivedDate.trim()
-  ];
+    ];
 
-  function checkFormValidity() {
-    canSubmit = requiredFields.every(fn => fn());
-  }
+function checkFormValidity() {
+  errors.name = !patient.name.trim();
+  errors.practitioner = !patient.practitioner.trim();
+  errors.email = !patient.email.trim();
+  errors.phone = !patient.phone.trim();
+  errors.activity = !patient.activity.trim();
+  errors.side = !patient.side.trim();
+  errors.age = !patient.age.trim();
+  errors.shipping = !order.shipping.trim();
+  errors.neededDate = !order.neededDate.trim();
+  errors.file = !uploadedFile;
+
+  canSubmit = Object.values(errors).every(val => !val);
+}
+
 
 
   async function handleSubmit() {
-    checkFormValidity();
-    if (!canSubmit) {
-      alert("Please fill out all required fields.");
-      return;
-    }
+  console.log("Submit button clicked");
 
-    try {
-      const response = await fetch('/api/submit-order', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ patient, order, liner, foot })
-      });
-
-      if (response.ok) {
-        alert("Order submitted successfully!");
-      } else {
-        alert("Failed to submit order.");
-      }
-    } catch (error) {
-      console.error("Submission error:", error);
-      alert("An error occurred during submission.");
-    }
+  checkFormValidity();
+  if (!canSubmit) {
+    alert("Please fill out all required fields.");
+    return;
   }
+
+  try {
+    const response = await fetch('/api/submit-order', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ patient, order, liner, foot })
+    });
+
+    if (response.ok) {
+      alert("Order submitted successfully!");
+    } else {
+      alert("Failed to submit order.");
+    }
+  } catch (error) {
+    console.error("Submission error:", error);
+    alert("An error occurred during submission.");
+  }
+}
+
 </script>
 
 
@@ -110,15 +147,20 @@
     }
 
     #form-wrapper {
-      position: absolute;
-      top: 0;
-      left: 0;
-      width: 8.5in;
-      padding: 0.4in;
-      box-sizing: border-box;
-      transform: scale(0.96);
-      transform-origin: top left;
-    }
+       position: absolute;
+  top: 0;
+  left: 0;
+  width: 8.5in;
+  padding: 0.4in;
+  box-sizing: border-box;
+
+  /* shrink slightly and center it with margin */
+  transform: scale(0.9);
+  
+  margin-left: 40px;
+  margin-right: 40px;
+  
+}
 
     #logo {
       height: 250px !important;
@@ -185,8 +227,24 @@
   }
 </style>
 
+<!-- File Upload Input -->
 
+<div class="mt-4 no-print flex justify-center border-2 border-[#f58220] w-[65%] p-4 mx-auto rounded">
+  <div class="flex flex-col items-center w-full max-w-sm">
+    <label for="fileUpload" class={`text-xl text-[#f58220] font-bold mb-2 text-center  ${errors.file ? 'border-2 border-red-500' : ''}`}>
+      Upload File:
+    </label>
+    <input
+      id="fileUpload"
+      type="file"
+      required
+      on:change={(e) => uploadedFile = e.target.files[0]}
+      class="block w-full text-sm text-gray-700 border border-gray-300 rounded py-2 px-3"
+    />
+  </div>
+</div>
 
+<!-- start of form -->
 <div id="form-wrapper" class="scale-[1.2] origin-top w-[850px] mx-auto print:mt-[-90px]">
 
 <div id="print-area">
@@ -226,34 +284,56 @@
     <!-- Order Info Row -->
     <div class="flex justify-end">
       <div class="border border-gray-400 p-2 w-[14%] h-16 text-center font-bold text-[#f58220]">PATIENT<br />INFORMATION</div>
-      <div class="border border-gray-400 p-2 w-[30%] h-16">
-        <label class="block text-xs font-semibold -mt-2">Workorder Number</label>
-        <input bind:value={order.workorder} class="w-full h-full text-[#f58220]" />
+      <div class="border border-gray-400 p-2 w-[25%] h-16">
+        <label class="block text-xs font-bold -mt-2 text-[#f58220]">Workorder Number</label>
+        <input bind:value={order.workorder} class="w-full h-full " />
       </div>
       <div class="border border-gray-400 p-2 w-[14%] h-16 text-center font-bold text-[#f58220]">CUSTOMER<br />INFORMATION</div>
-     <div class="border border-gray-400 p-2 w-[14%] h-16">
-  <label class="block text-xs font-semibold -mt-2">Shipping Method</label>
-  <input bind:value={order.shipping} required on:input={checkFormValidity} class="w-full h-full" />
+     <div class="border border-gray-400 p-2 w-[16.5%] h-16">
+  <label class="block text-xs font-semibold  -mt-2">Shipping Method</label>
+  <select
+    bind:value={order.shipping}
+    required
+    on:input={checkFormValidity}
+    class={`w-full h-full bg-white text-xs ${errors.shipping ? 'border-2 border-red-500' : ''}`} 
+  >
+    <option value="" disabled selected>Select method</option>
+    <optgroup label="UPS">
+      <option value="UPS Ground">UPS Ground</option>
+      <option value="UPS 2nd Day Air">UPS 2nd Day Air</option>
+      <option value="UPS Next Day Air">UPS Next Day Air</option>
+    </optgroup>
+    <optgroup label="FedEx">
+      <option value="FedEx Ground">FedEx Ground</option>
+      <option value="FedEx Express Saver">FedEx Express Saver</option>
+      <option value="FedEx 2Day">FedEx 2Day</option>
+      <option value="FedEx Standard Overnight">FedEx Standard Overnight</option>
+    </optgroup>
+    <option value="In-Site Pickup">In-Site Pickup</option>
+  </select>
 </div>
-<div class="border border-gray-400 p-2 w-[14%] h-16">
+
+<div class="border border-gray-400 p-2 w-[16.5%] h-16">
   <label class="block text-xs font-semibold -mt-2">Needed Date</label>
-  <input type="date" bind:value={order.neededDate} required on:input={checkFormValidity} class="w-full h-full" />
+  <input type="date" bind:value={order.neededDate} required on:input={checkFormValidity} class={`w-full h-full ${errors.neededDate ? 'border-2 border-red-500' : ''}`} />
 </div>
 <div class="border border-gray-400 p-2 w-[14%] h-16">
   <label class="block text-xs font-semibold -mt-2">Received Date</label>
-  <input type="date" bind:value={order.receivedDate} required on:input={checkFormValidity} class="w-full h-full" />
+<input type="text" class="w-[107%]" bind:value={order.receivedDate} />
+
 </div>
+
 
     </div>
 
     <!-- Patient Info -->
    <div class="space-y-1">
   <div class="flex">
-    <div class="border border-gray-400 p-2 w-[44%] h-12">
+    <div class="border border-gray-400 p-2 w-[39%] h-12">
       <label class="block text-xs font-semibold -mt-2">Patient Name</label>
-      <input bind:value={patient.name} required on:input={checkFormValidity} class="w-full h-full" />
+      <input bind:value={patient.name} required on:input={checkFormValidity} class={`w-full h-full ${errors.name ? 'border-2 border-red-500' : ''}`}  />
     </div>
-    <div class="border border-gray-400 p-2 w-[28%] h-12">
+    <div class="border border-gray-400 p-2 w-[33%] h-12">
       <label class="block text-xs font-semibold -mt-2">Facility</label>
       <input bind:value={patient.facility} class="w-full h-full" />
     </div>
@@ -263,48 +343,48 @@
     </div>
   </div>
   <div class="flex">
-    <div class="border border-gray-400 p-2 w-[14.67%] h-12">
+    <div class="border border-gray-400 p-2 w-[13%] h-12">
       <label class="block text-xs font-semibold -mt-2">Height</label>
       <input bind:value={patient.height} class="w-full h-full" />
     </div>
-    <div class="border border-gray-400 p-2 w-[14.67%] h-12">
+    <div class="border border-gray-400 p-2 w-[13%] h-12">
       <label class="block text-xs font-semibold -mt-2">Weight</label>
       <input bind:value={patient.weight} class="w-full h-full" />
     </div>
-    <div class="border border-gray-400 p-2 w-[14.67%] h-12">
+    <div class="border border-gray-400 p-2 w-[13%] h-12">
       <label class="block text-xs font-semibold -mt-2">Age</label>
       <input bind:value={patient.age} required on:input={checkFormValidity} class="w-full h-full" />
     </div>
-    <div class="border border-gray-400 p-2 w-[56%] h-12">
+    <div class="border border-gray-400 p-2 w-[61%] h-12">
       <label class="block text-xs font-semibold -mt-2">Practitioner</label>
-      <input bind:value={patient.practitioner} required on:input={checkFormValidity} class="w-full h-full" />
+      <input bind:value={patient.practitioner} required on:input={checkFormValidity} class={`w-full h-full ${errors.practitioner ? 'border-2 border-red-500' : ''}`} />
     </div>
   </div>
   <div class="flex">
-    <div class="border border-gray-400 p-2 w-[14.67%] h-12">
+    <div class="border border-gray-400 p-2 w-[13%] h-12">
       <label class="block text-xs font-semibold -mt-2">Sex</label>
       <input bind:value={patient.sex} class="w-full h-full" />
     </div>
-    <div class="border border-gray-400 p-2 w-[14.67%] h-12">
+    <div class="border border-gray-400 p-2 w-[13%] h-12">
       <label class="block text-xs font-semibold -mt-2">Activity Level</label>
-      <input bind:value={patient.activity} required on:input={checkFormValidity} class="w-full h-full" />
+      <input bind:value={patient.activity} required on:input={checkFormValidity} class={`w-full h-full ${errors.activity ? 'border-2 border-red-500' : ''}`} />
     </div>
-    <div class="border border-gray-400 p-2 w-[14.67%] h-12">
+    <div class="border border-gray-400 p-2 w-[13%] h-12">
       <label class="block text-xs font-semibold -mt-2 text-center">Side</label>
       <div class="flex gap-2 items-center justify-center">
-        <label>
-          <input type="radio" bind:group={patient.side} value="left" required on:input={checkFormValidity} />
+        <label class="flex items-center gap-0.5">
+          <input type="radio" bind:group={patient.side} value="left" required on:input={checkFormValidity} class={`${errors.side ? 'border-2 border-red-500' : ''}`} />
           Left
         </label>
-        <label>
-          <input type="radio" bind:group={patient.side} value="right" required on:input={checkFormValidity} />
+        <label class="flex items-center gap-0.5">
+          <input type="radio" bind:group={patient.side} value="right" required on:input={checkFormValidity} class={` ${errors.side ? 'border-2 border-red-500' : ''}`} />
           Right
         </label>
       </div>
     </div>
-    <div class="border border-gray-400 p-2 w-[28%] h-12">
+    <div class="border border-gray-400 p-2 w-[33%] h-12">
       <label class="block text-xs -mt-2 font-semibold">Email</label>
-      <input bind:value={patient.email} required on:input={checkFormValidity} class="w-full h-full" />
+      <input bind:value={patient.email} required on:input={checkFormValidity} class={`w-full h-full ${errors.name ? 'border-2 border-red-500' : ''}`}/>
     </div>
     <div class="border border-gray-400 p-2 w-[28%] h-12">
       <label class="block text-xs -mt-2 font-semibold">Phone Number</label>
@@ -328,7 +408,7 @@
       </div>
 
       <div class="text-sm">
-  <h4 class="text-sm font-semibold text-[#f58220]">Liner Type</h4>
+  <h4 class="text-lg font-semibold text-[#f58220]">Liner Type</h4>
   <div class="pl-2 space-y-1">
     <div class="flex items-center gap-1">
       <label class="w-20">Type:</label>
@@ -357,23 +437,23 @@
   </div>
 </div>
 
-
+ 
       <div>
-        <h4 class="text-base font-semibold text-[#f58220]">Suspension</h4>
+        <h4 class="text-lg font-semibold text-[#f58220]">Suspension</h4>
         {#each ['Section', 'Pin Lock Type', 'Silicone Valve Sleeve'] as s}
           <label class="flex items-center gap-2"><input type="checkbox" class="w-4 h-4" /> {s}</label>
         {/each}
       </div>
 
       <div>
-        <h4 class="text-base font-semibold text-[#f58220]">Distal End</h4>
+        <h4 class="text-lg font-semibold text-[#f58220]">Distal End</h4>
         {#each ['Fitted', 'Injection Void', 'Injection Kit'] as s}
           <label class="flex items-center gap-2"><input type="checkbox" class="w-4 h-4" /> {s}</label>
         {/each}
       </div>
 
       <div class="text-sm">
-  <h4 class="text-sm font-semibold text-[#f58220]">Foot</h4>
+  <h4 class="text-lg font-semibold text-[#f58220]">Foot</h4>
   <div class="pl-2 space-y-1">
     <div class="flex items-center gap-1">
       <label class="w-12">Type:</label>
@@ -405,7 +485,7 @@
 
   <!-- Notes Section -->
   <div class="mt-4" id="notes">
-    <h3 class="text-xl font-bold text-[#f58220] border-b pb-1">Notes and Modification Instructions</h3>
+    <h3 class="text-2xl font-bold text-[#f58220] border-b pb-1">Notes and Modification Instructions</h3>
     <div class="border border-dashed border-gray-400 h-24 p-2 mt-1 text-sm">
       <textarea
       rows="4"
@@ -418,13 +498,17 @@
   <!-- Footer -->
   <div class="text-center text-lg mt-4">
    <div class="text-center mt-6 no-print">
- <button
-  on:click={handleSubmit}
+<button
+  on:click={() => {
+    console.log("Submit button clicked");
+    handleSubmit();
+  }}
   class="bg-[#f58220] text-white font-bold py-2 px-6 rounded hover:bg-[#e4711a] transition"
-  disabled={!canSubmit}
 >
   Submit Order
 </button>
+
+
 </div>
 
     <p class="mt-2 text-sm">
