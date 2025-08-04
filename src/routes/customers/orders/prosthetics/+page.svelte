@@ -1,4 +1,5 @@
 <script>
+  
   const sections = [
     { name: 'Transtibial', link: '/customers/orders/prosthetics/transtibial', img: '/transtibial.png' },
     { name: 'Transfemoral', link: '/customers/orders/prosthetics/transfemoral', img: '/prosthetic.png' },

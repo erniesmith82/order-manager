@@ -92,6 +92,30 @@ function checkFormValidity() {
     alert("An error occurred during submission.");
   }
 }
+// Get current year and ISO week number
+function getCurrentWorkorderPrefix() {
+  const now = new Date();
+  const year = now.getFullYear().toString().slice(-2);
+
+  // Calculate ISO week number
+  const start = new Date(now.getFullYear(), 0, 1);
+  const days = Math.floor((now - start) / (24 * 60 * 60 * 1000));
+  const week = Math.ceil((days + start.getDay() + 1) / 7);
+
+  const paddedWeek = String(week).padStart(2, '0');
+  return `${year}${paddedWeek}`;
+}
+
+// For now, we start with order #1 (buffered as 0001)
+function generateWorkorderNumber(sequence = 1) {
+  const prefix = getCurrentWorkorderPrefix();
+  const paddedSeq = String(sequence).padStart(4, '0');
+  return `${prefix}${paddedSeq}`;
+}
+
+// Initialize the value
+order.workorder = generateWorkorderNumber();
+
 
 </script>
 
@@ -102,7 +126,30 @@ function checkFormValidity() {
       size: 8.5in 11in;
       margin: 0;
     }
+      select {
+      appearance: none;
+      -webkit-appearance: none;
+      -moz-appearance: none;
+      background: none;
+      padding-right: 0;
+      font-size: 10pt !important;
+      text-overflow: clip;
+    }
 
+    option {
+      font-size: 10pt;
+    }
+  
+  /* Remove calendar icon (Chrome, Edge, Safari) */
+  input[type="date"]::-webkit-calendar-picker-indicator {
+    display: none;
+    -webkit-appearance: none;
+  }
+
+  /* Optional: remove background icon space */
+  input[type="date"] {
+    background: none;
+  }
     input[type="checkbox"] {
       appearance: none;
       -webkit-appearance: none;
@@ -158,7 +205,20 @@ function checkFormValidity() {
   margin-right: 40px;
   
 }
+ #measurementB{
+   left: 51.5%;
+   top: 51%;
+ }
 
+  #measurementA{
+   left: 85.5%;
+   top: 49%;
+ }
+
+  #measurementD{
+   left: 59%;
+   top: 59.5%;
+ }
     #logo {
       height: 250px !important;
       max-width: 100% !important;
@@ -166,7 +226,8 @@ function checkFormValidity() {
 
     img[alt="Socket Diagram"] {
       height: 600px !important;
-      margin-top: -120px !important;
+      width: auto;
+      margin-top: -125px !important;
     }
 
     #print-header {
@@ -193,7 +254,7 @@ function checkFormValidity() {
     }
 
     #notes {
-      margin-top: -3rem !important;
+      margin-top: -1rem !important;
     }
 
     input, textarea, select {
@@ -222,11 +283,12 @@ function checkFormValidity() {
       width: 100% !important;
     }
   }
+
 </style>
 
 <!-- File Upload Input -->
-
-<div class="mt-4 no-print flex justify-center border-2 border-[#f58220] w-[65%] p-4 mx-auto rounded">
+ <div id=" fullPage" class="h-490 bg-gradient-to-b from-black/60 via-gray-900/50 to-black/60  p-8">
+<div class="mt-4 no-print flex justify-center border-2 border-[#f58220] w-[65%] bg-white p-4 mx-auto rounded">
   <div class="flex flex-col items-center w-full max-w-sm">
     <label for="fileUpload" class={`text-xl text-[#f58220] font-bold mb-2 text-center  ${errors.file ? 'border-2 border-red-500' : ''}`}>
       Upload File:
@@ -242,7 +304,8 @@ function checkFormValidity() {
 </div>
 
 <!-- start of form -->
-<div id="form-wrapper" class="scale-[1.2] origin-top w-[850px] mx-auto print:mt-[-90px]">
+
+<div id="form-wrapper" class="scale-[1.2] origin-top w-[1100px] p-8 mx-auto mt-5 print:mt-[-90px] bg-white">
 
 <div id="print-area">
   <div id="print-header" class="print:scale-[0.85] print:origin-top-left px-4 print:px-2 pt-2 border-b-2 border-black flex justify-between items-center">
@@ -281,10 +344,10 @@ function checkFormValidity() {
     <!-- Order Info Row -->
     <div class="flex justify-end">
       <div class="border border-gray-400 p-2 w-[14%] h-16 text-center font-bold text-[#f58220]">PATIENT<br />INFORMATION</div>
-      <div class="border border-gray-400 p-2 w-[25%] h-16">
-        <label class="block text-xs font-bold -mt-2 text-[#f58220]">Workorder Number</label>
-        <input bind:value={order.workorder} class="w-full h-full " />
-      </div>
+    <div class="border border-gray-400 p-2 w-[25%] h-16">
+  <label class="block text-xs font-bold -mt-2 text-[#f58220]">Workorder Number</label>
+  <input bind:value={order.workorder} class="w-full h-full font-bold text-2xl" />
+</div>
       <div class="border border-gray-400 p-2 w-[14%] h-16 text-center font-bold text-[#f58220]">CUSTOMER<br />INFORMATION</div>
      <div class="border border-gray-400 p-2 w-[16.5%] h-16">
   <label class="block text-xs font-semibold  -mt-2">Shipping Method</label>
@@ -312,7 +375,13 @@ function checkFormValidity() {
 
 <div class="border border-gray-400 p-2 w-[16.5%] h-16">
   <label class="block text-xs font-semibold -mt-2">Needed Date</label>
-  <input type="date" bind:value={order.neededDate} required on:input={checkFormValidity} class={`w-full h-full ${errors.neededDate ? 'border-2 border-red-500' : ''}`} />
+  <input
+    type="date"
+    bind:value={order.neededDate}
+    required
+    on:input={checkFormValidity}
+    class={`w-full h-full ${errors.neededDate ? 'border-2 border-red-500' : ''}`}
+  />
 </div>
 <div class="border border-gray-400 p-2 w-[14%] h-16">
   <label class="block text-xs font-semibold -mt-2">Received Date</label>
@@ -467,6 +536,7 @@ function checkFormValidity() {
         placeholder="Size"
         class="border-b border-black w-[50%] bg-transparent outline-none text-sm py-0.5"
       />
+      
     </div>
   </div>
 </div>
@@ -474,8 +544,24 @@ function checkFormValidity() {
 
     <div class="w-1/2 flex flex-col items-center">
       <img src="/transtibialDiagram.png" alt="Socket Diagram" class="h-[650px] object-contain -mt-0 relative z-0" />
+      <input id="measurementB"
+    type="text"
+    class="absolute top-[54%] left-[55%] w-16 h-8 border font-bold text-center text-sm"
+    placeholder=""
+  />
+     <input id="measurementD"
+    type="text"
+    class="absolute top-[52.5%] left-[85.5%] w-16 h-8 border font-bold text-center text-sm"
+    placeholder=""
+  />
+   <input id="measurementA"
+    type="text"
+    class="absolute top-[62.5%] left-[62%] w-16 h-8 border font-bold text-center text-sm"
+    placeholder=""
+  />
       <div id="legend" class="text-center text-xs pt-1 -mt-30">
         a. SC ML<br />b. Femoral Condyle ML<br />c. Depth of Medial Flare<br />d. MPT to Distal
+        <br> <strong>IF LINER IS UTO BE USED, MEASUREMENTS ARE TAKEN OVER LINER. </strong>
       </div>
     </div>
   </div>
@@ -514,4 +600,4 @@ function checkFormValidity() {
   </div>
 </div>
 </div>
-
+</div>
