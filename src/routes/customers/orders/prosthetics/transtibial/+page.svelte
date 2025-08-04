@@ -148,15 +148,12 @@ function checkFormValidity() {
 
     #form-wrapper {
        position: absolute;
-  top: 0;
+  top: 45px;
   left: 0;
   width: 8.5in;
   padding: 0.4in;
   box-sizing: border-box;
-
-  /* shrink slightly and center it with margin */
-  transform: scale(0.9);
-  
+  transform: scale(0.85);
   margin-left: 40px;
   margin-right: 40px;
   
@@ -373,11 +370,11 @@ function checkFormValidity() {
       <label class="block text-xs font-semibold -mt-2 text-center">Side</label>
       <div class="flex gap-2 items-center justify-center">
         <label class="flex items-center gap-0.5">
-          <input type="radio" bind:group={patient.side} value="left" required on:input={checkFormValidity} class={`${errors.side ? 'border-2 border-red-500' : ''}`} />
+          <input type="checkbox" bind:group={patient.side} value="left" required on:input={checkFormValidity} class={`${errors.side ? 'border-2 border-red-500' : ''}`} />
           Left
         </label>
         <label class="flex items-center gap-0.5">
-          <input type="radio" bind:group={patient.side} value="right" required on:input={checkFormValidity} class={` ${errors.side ? 'border-2 border-red-500' : ''}`} />
+          <input type="checkbox" bind:group={patient.side} value="right" required on:input={checkFormValidity} class={` ${errors.side ? 'border-2 border-red-500' : ''}`} />
           Right
         </label>
       </div>
