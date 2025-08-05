@@ -2,7 +2,7 @@
   let patient = {
     name: '', facility: '', account: '',
     height: '', weight: '', age: '', practitioner: '',
-    sex: '', activity: '', side: '', email: '', phone: ''
+    sex: '', activity: '', side: [], email: '', phone: ''
   };
 
 let now = new Date();
@@ -50,18 +50,21 @@ let errors = {
     ];
 
 function checkFormValidity() {
-  errors.name = !patient.name.trim();
-  errors.practitioner = !patient.practitioner.trim();
-  errors.email = !patient.email.trim();
-  errors.phone = !patient.phone.trim();
-  errors.activity = !patient.activity.trim();
-  errors.side = !patient.side.trim();
-  errors.age = !patient.age.trim();
-  errors.shipping = !order.shipping.trim();
-  errors.neededDate = !order.neededDate.trim();
-  errors.file = !uploadedFile;
+  const requiredFields = [
+    patient.name,
+    patient.practitioner,
+    patient.email,
+    patient.phone,
+    patient.activity,
+    patient.side,
+    order.shipping,
+    order.neededDate,
+    order.receivedDate
+  ];
 
-  canSubmit = Object.values(errors).every(val => !val);
+  canSubmit = requiredFields.every(field =>
+  (typeof field === 'string' && field.trim() !== '') || (Array.isArray(field) && field.length > 0)
+);
 }
 
 
@@ -82,11 +85,10 @@ function checkFormValidity() {
       body: JSON.stringify({ patient, order, liner, foot })
     });
 
-    if (response.ok) {
-      alert("Order submitted successfully!");
-    } else {
-      alert("Failed to submit order.");
-    }
+ if (response.ok) {
+  alert("Order submitted successfully!");
+  window.location.href = '/customers/orders/outstanding'; // or wherever
+}
   } catch (error) {
     console.error("Submission error:", error);
     alert("An error occurred during submission.");
@@ -115,6 +117,7 @@ function generateWorkorderNumber(sequence = 1) {
 
 // Initialize the value
 order.workorder = generateWorkorderNumber();
+
 
 
 </script>

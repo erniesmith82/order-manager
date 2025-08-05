@@ -1,5 +1,8 @@
 <script>
+  import { onMount } from 'svelte';
+
   let activeTab = 'outstanding';
+  let orders = [];
 
   const tabs = [
     { label: 'Outstanding', key: 'outstanding' },
@@ -15,6 +18,13 @@
     { name: 'MARAMED™', img: '/maramed-logo.png', link: '/customers/orders/maramed' },
     { name: 'Foam Blanks', img: '/foam-blanks.png', link: '/customers/orders/foam-blanks' }
   ];
+
+  onMount(async () => {
+    const res = await fetch('/api/get-orders');
+    if (res.ok) {
+      orders = await res.json();
+    }
+  });
 </script>
 
 <div class="p-6">
@@ -47,11 +57,22 @@
           </tr>
         </thead>
         <tbody>
-          <!-- Placeholder: Empty for now -->
-          <tr>
-            <td colspan="4" class="text-center px-6 py-6 text-gray-400">No outstanding orders.</td>
-          </tr>
-        </tbody>
+  {#if orders.length > 0}
+    {#each orders as order}
+      <tr>
+        <td class="px-6 py-4 font-bold text-[#f58220]">{order.workorder}</td>
+        <td class="px-6 py-4">{order.patient?.name || 'Unknown'}</td>
+        <td class="px-6 py-4">Transtibial</td>
+        <td class="px-6 py-4 text-green-600 font-medium">Received</td>
+      </tr>
+    {/each}
+  {:else}
+    <tr>
+      <td colspan="4" class="text-center px-6 py-6 text-gray-400">No outstanding orders.</td>
+    </tr>
+  {/if}
+</tbody>
+
       </table>
     </div>
   {/if}

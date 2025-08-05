@@ -1,40 +1,43 @@
-// src/routes/api/submit-order/+server.js
+// /src/routes/api/submit-order/+server.js
 import fs from 'fs';
 import path from 'path';
+import { fileURLToPath } from 'url';
+
+// Setup __dirname equivalent in ES Modules
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
+
+// Define baseDir pointing to /static/orders
+const baseDir = path.resolve(__dirname, '../../../static/orders');
 
 export async function POST({ request }) {
+  const data = await request.json();
+  const { order, patient, liner, foot } = data;
+
   try {
-    const data = await request.json();
-    const { order } = data;
-
-    // Validate workorder format (e.g., "25310005")
-    const workorder = order?.workorder?.trim();
-    if (!/^\d{8}$/.test(workorder)) {
-      return new Response(JSON.stringify({ error: 'Invalid workorder format' }), { status: 400 });
-    }
-
+    const workorder = order.workorder || '';
     const year = workorder.slice(0, 2);
     const week = workorder.slice(2, 4);
-    const number = workorder.slice(4);
-    const dirPath = path.resolve('orders', year, week, number);
-    const filePath = path.join(dirPath, 'order.json');
+    const rawOrderNum = workorder.slice(4);
+    const orderNumber = parseInt(rawOrderNum, 10).toString().padStart(2, '0');
 
-    // Make directories if they don't exist
-    fs.mkdirSync(dirPath, { recursive: true });
+    const folderPath = path.join(baseDir, year, week, orderNumber);
 
-    // Write the order data
-    fs.writeFileSync(filePath, JSON.stringify(data, null, 2), 'utf8');
+    // Make sure folders exist
+    fs.mkdirSync(folderPath, { recursive: true });
 
-    console.log(`✅ Order saved: ${filePath}`);
-    return new Response(JSON.stringify({ message: 'Order saved successfully!' }), {
-      status: 200,
-      headers: { 'Content-Type': 'application/json' },
-    });
+    // Save full order
+    fs.writeFileSync(
+      path.join(folderPath, 'order.json'),
+      JSON.stringify({ patient, order, liner, foot }, null, 2)
+    );
+
+    return new Response(JSON.stringify({ success: true }), { status: 200 });
+
   } catch (err) {
-    console.error('❌ Error saving order:', err);
-    return new Response(JSON.stringify({ error: 'Server error' }), {
-      status: 500,
-      headers: { 'Content-Type': 'application/json' },
+    console.error('Error saving order:', err);
+    return new Response(JSON.stringify({ success: false, error: err.message }), {
+      status: 500
     });
   }
 }
