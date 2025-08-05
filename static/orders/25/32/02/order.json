@@ -1,0 +1,33 @@
+{
+  "order": {
+    "workorder": "25320002",
+    "shipping": "FedEx Ground",
+    "receivedDate": "08/05/2025",
+    "neededDate": "2025-08-07"
+  },
+  "patient": {
+    "name": "Arles Aviles",
+    "facility": "Hanger",
+    "account": "5552424",
+    "height": "5'8\"",
+    "weight": "250lbs",
+    "age": "33",
+    "practitioner": "Finnieston",
+    "sex": "M",
+    "activity": "K3",
+    "side": [
+      "right"
+    ],
+    "email": "example.com",
+    "phone": "5552424"
+  },
+  "liner": {
+    "type": "",
+    "size": "",
+    "thickness": ""
+  },
+  "foot": {
+    "type": "",
+    "size": ""
+  }
+}

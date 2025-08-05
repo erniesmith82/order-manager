@@ -1,6 +1,7 @@
 <script>
   import { onMount } from 'svelte';
 
+  
   let activeTab = 'outstanding';
   let orders = [];
 
@@ -19,12 +20,16 @@
     { name: 'Foam Blanks', img: '/foam-blanks.png', link: '/customers/orders/foam-blanks' }
   ];
 
-  onMount(async () => {
-    const res = await fetch('/api/get-orders');
-    if (res.ok) {
-      orders = await res.json();
-    }
-  });
+onMount(async () => {
+  const res = await fetch('/api/get-orders');
+  if (res.ok) {
+    orders = await res.json();
+    console.log('✅ Fetched orders:', orders); // ⬅️ Check this in browser console
+  } else {
+    console.error('❌ Failed to fetch orders');
+  }
+});
+
 </script>
 
 <div class="p-6">
@@ -45,37 +50,48 @@
   </div>
 
   <!-- Outstanding Tab -->
-  {#if activeTab === 'outstanding'}
-    <div class="bg-white border rounded-lg shadow overflow-x-auto">
-      <table class="min-w-full text-sm text-left text-gray-700">
-        <thead class="bg-gray-100 border-b text-xs uppercase">
-          <tr>
-            <th class="px-6 py-3">Order</th>
-            <th class="px-6 py-3">Patient</th>
-            <th class="px-6 py-3">Type</th>
-            <th class="px-6 py-3">Status</th>
-          </tr>
-        </thead>
-        <tbody>
-  {#if orders.length > 0}
-    {#each orders as order}
-      <tr>
-        <td class="px-6 py-4 font-bold text-[#f58220]">{order.workorder}</td>
-        <td class="px-6 py-4">{order.patient?.name || 'Unknown'}</td>
-        <td class="px-6 py-4">Transtibial</td>
-        <td class="px-6 py-4 text-green-600 font-medium">Received</td>
-      </tr>
-    {/each}
-  {:else}
-    <tr>
-      <td colspan="4" class="text-center px-6 py-6 text-gray-400">No outstanding orders.</td>
-    </tr>
-  {/if}
-</tbody>
+{#if activeTab === 'outstanding'}
 
-      </table>
-    </div>
-  {/if}
+  <div class="bg-white border rounded-lg shadow overflow-x-auto">
+    <table class="min-w-full text-sm text-left text-gray-700">
+      <thead class="bg-gray-100 border-b text-xs uppercase">
+        <tr>
+          <th class="px-6 py-3">Workorder</th>
+          <th class="px-6 py-3">Patient</th>
+          <th class="px-6 py-3">Type</th>
+          <th class="px-6 py-3">Status</th>
+          <th class="px-6 py-3">Submitted</th>
+          <th class="px-6 py-3">View</th>
+        </tr>
+      </thead>
+      <tbody>
+        {#if orders.length > 0}
+          {#each orders as order}
+            <tr class="border-b">
+              <td class="px-6 py-4 font-medium">{order.order?.workorder}</td>
+              <td class="px-6 py-4">{order.patient?.name}</td>
+              <td class="px-6 py-4">Transtibial</td>
+              <td class="px-6 py-4">Pending</td>
+              <td class="px-6 py-4">{new Date(order.submittedAt).toLocaleDateString()}</td>
+              <td class="px-6 py-4">
+                <a
+                  class="text-blue-600 hover:underline font-medium"
+                  href={`/customers/orders/view/${order.order?.workorder}`}
+                >
+                  View
+                </a>
+              </td>
+            </tr>
+            
+          {/each}
+        {:else}
+          <tr><td colspan="6" class="text-center py-4">No outstanding orders.</td></tr>
+        {/if}
+      </tbody>
+    </table>
+  </div>
+{/if}
+
 
   <!-- Order History Tab -->
   {#if activeTab === 'history'}

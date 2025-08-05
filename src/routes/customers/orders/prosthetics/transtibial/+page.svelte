@@ -1,78 +1,75 @@
 <script>
+  import { onMount } from 'svelte';
+
+let order = { workorder: '' };
+  let sequenceCounter = 1;
+
+  function getCurrentWorkorderPrefix() {
+    const now = new Date();
+    const year = now.getFullYear().toString().slice(-2);
+    const start = new Date(now.getFullYear(), 0, 1);
+    const days = Math.floor((now - start) / (24 * 60 * 60 * 1000));
+    const week = Math.ceil((days + start.getDay() + 1) / 7);
+    return `${year}${String(week).padStart(2, '0')}`;
+  }
+
+  function generateWorkorderNumber(seq = 1) {
+    const prefix = getCurrentWorkorderPrefix();
+    const padded = String(seq).padStart(4, '0');
+    return `${prefix}${padded}`;
+  }
+
+
+  
+onMount(() => {
+  const generated = generateWorkorderNumber(++sequenceCounter);
+  console.log("Generated on mount:", generated);
+  order.workorder = generated;
+  order.receivedDate = todayFormatted;
+});
+
   let patient = {
     name: '', facility: '', account: '',
     height: '', weight: '', age: '', practitioner: '',
     sex: '', activity: '', side: [], email: '', phone: ''
   };
 
-let now = new Date();
-let todayFormatted = `${String(now.getMonth() + 1).padStart(2, '0')}/${String(now.getDate()).padStart(2, '0')}/${now.getFullYear()}`;
-let today = now.toISOString().split('T')[0]; 
-
-let order = {
-  shipping: '',
-  neededDate: '',
-  receivedDate: todayFormatted, // US MM/DD/YYYY display format
-  workorder: ''
-};
-
-let errors = {
-  name: false,
-  practitioner: false,
-  email: false,
-  phone: false,
-  activity: false,
-  side: false,
-  shipping: false,
-  neededDate: false,
-  receivedDate: false,
-  file: false
-};
-
-  let uploadedFile = null;
-
-
+  let now = new Date();
+  let todayFormatted = `${String(now.getMonth() + 1).padStart(2, '0')}/${String(now.getDate()).padStart(2, '0')}/${now.getFullYear()}`;
+  let today = now.toISOString().split('T')[0];
   let liner = { type: '', size: '', thickness: '' };
   let foot = { type: '', size: '' };
-
+  let uploadedFile = null;
   let canSubmit = false;
 
-  let requiredFields = [
-    () => patient.name.trim(),
-    () => patient.practitioner.trim(),
-    () => patient.email.trim(),
-    () => patient.phone.trim(),
-    () => patient.activity.trim(),
-    () => patient.side.trim(),
-    () => patient.age.trim(),
-    () => order.shipping.trim(),
-    () => order.neededDate.trim(),
+  let errors = {
+    name: false, practitioner: false, email: false, phone: false, activity: false, side: false,
+    shipping: false, neededDate: false, receivedDate: false, file: false
+  };
+
+  function checkFormValidity() {
+    const requiredFields = [
+      patient.name,
+      patient.practitioner,
+      patient.email,
+      patient.phone,
+      patient.activity,
+      patient.side,
+      patient.age,
+      order.shipping,
+      order.neededDate,
+      order.receivedDate
     ];
 
-function checkFormValidity() {
-  const requiredFields = [
-    patient.name,
-    patient.practitioner,
-    patient.email,
-    patient.phone,
-    patient.activity,
-    patient.side,
-    order.shipping,
-    order.neededDate,
-    order.receivedDate
-  ];
-
-  canSubmit = requiredFields.every(field =>
-  (typeof field === 'string' && field.trim() !== '') || (Array.isArray(field) && field.length > 0)
-);
-}
+    canSubmit = requiredFields.every(field =>
+      (typeof field === 'string' && field.trim() !== '') || (Array.isArray(field) && field.length > 0)
+    );
+  }
 
 
-
-  async function handleSubmit() {
-  console.log("Submit button clicked");
-
+ async function handleSubmit() {
   checkFormValidity();
+
   if (!canSubmit) {
     alert("Please fill out all required fields.");
     return;
@@ -85,38 +82,22 @@ function checkFormValidity() {
       body: JSON.stringify({ patient, order, liner, foot })
     });
 
- if (response.ok) {
-  alert("Order submitted successfully!");
-  window.location.href = '/customers/orders/outstanding'; // or wherever
-}
+    const result = await response.json();
+
+    if (response.ok && result.success) {
+      order.workorder = result.workorder; // server-supplied
+      alert(`Order ${order.workorder} submitted successfully!`);
+      window.location.href = '/customers/orders/outstanding'; // ✅ Redirect here
+    } else {
+      alert("Submission failed.");
+    }
+
   } catch (error) {
     console.error("Submission error:", error);
     alert("An error occurred during submission.");
   }
 }
-// Get current year and ISO week number
-function getCurrentWorkorderPrefix() {
-  const now = new Date();
-  const year = now.getFullYear().toString().slice(-2);
 
-  // Calculate ISO week number
-  const start = new Date(now.getFullYear(), 0, 1);
-  const days = Math.floor((now - start) / (24 * 60 * 60 * 1000));
-  const week = Math.ceil((days + start.getDay() + 1) / 7);
-
-  const paddedWeek = String(week).padStart(2, '0');
-  return `${year}${paddedWeek}`;
-}
-
-// For now, we start with order #1 (buffered as 0001)
-function generateWorkorderNumber(sequence = 1) {
-  const prefix = getCurrentWorkorderPrefix();
-  const paddedSeq = String(sequence).padStart(4, '0');
-  return `${prefix}${paddedSeq}`;
-}
-
-// Initialize the value
-order.workorder = generateWorkorderNumber();
 
 
 
@@ -349,7 +330,8 @@ order.workorder = generateWorkorderNumber();
       <div class="border border-gray-400 p-2 w-[14%] h-16 text-center font-bold text-[#f58220]">PATIENT<br />INFORMATION</div>
     <div class="border border-gray-400 p-2 w-[25%] h-16">
   <label class="block text-xs font-bold -mt-2 text-[#f58220]">Workorder Number</label>
-  <input bind:value={order.workorder} class="w-full h-full font-bold text-2xl" />
+  <input type="text" bind:value={order.workorder} readonly class="w-full h-full font-bold text-2xl" />
+
 </div>
       <div class="border border-gray-400 p-2 w-[14%] h-16 text-center font-bold text-[#f58220]">CUSTOMER<br />INFORMATION</div>
      <div class="border border-gray-400 p-2 w-[16.5%] h-16">
