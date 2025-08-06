@@ -1,29 +1,19 @@
-<script context="module">
-  export async function load({ params, fetch }) {
-    const res = await fetch(`/api/get-order/${params.workorder}`);
-    const data = await res.json();
-
-    return {
-      order: data.order
-    };
-  }
-</script>
-
 <script>
-  export let order;
+  export let data;
+  const order = data.order;
+  
+  const yy = order?.order?.workorder?.slice(0, 2);
+  const ww = order?.order?.workorder?.slice(2, 4);
+  const nn = parseInt(order?.order?.workorder?.slice(4), 10).toString().padStart(2, '0');
 </script>
 
-<h1 class="text-2xl font-bold mb-4">Order Details</h1>
-
-{#if order}
-  <div class="space-y-2">
-    <div><strong>Patient:</strong> {order.patient.name}</div>
-    <div><strong>Practitioner:</strong> {order.patient.practitioner}</div>
-    <div><strong>Workorder:</strong> {order.order.workorder}</div>
-    <div><strong>Date Submitted:</strong> {new Date(order.submittedAt).toLocaleString()}</div>
-    <div><strong>Shipping:</strong> {order.order.shipping}</div>
-    <!-- Add more fields as needed -->
+{#if order?.order?.workorder}
+  <div class="mt-4 flex flex-col items-center justify-center text-center h-120%">
+    <h2 class="text-xl font-semibold mb-4">Printable Order Form</h2>
+    <img
+      src={`/orders/${yy}/${ww}/${nn}/printable.jpg`}
+      alt="Printable Order"
+      class="border rounded w-full max-w-4xl"
+    />
   </div>
-{:else}
-  <p>Order not found.</p>
 {/if}

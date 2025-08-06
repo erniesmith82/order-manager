@@ -1,0 +1,33 @@
+{
+  "order": {
+    "workorder": "25320004",
+    "receivedDate": "08/06/2025",
+    "shipping": "UPS Ground",
+    "neededDate": "2025-08-06"
+  },
+  "patient": {
+    "name": "adadada",
+    "facility": "sdasdasd",
+    "account": "asdas",
+    "height": "sdasd",
+    "weight": "sdas",
+    "age": "dasda",
+    "practitioner": "dasdasda",
+    "sex": "asd",
+    "activity": "asdsd",
+    "side": [
+      "left"
+    ],
+    "email": "dasasdadad",
+    "phone": "dasdasd"
+  },
+  "liner": {
+    "type": "",
+    "size": "",
+    "thickness": ""
+  },
+  "foot": {
+    "type": "",
+    "size": ""
+  }
+}

@@ -1,32 +1,18 @@
 <script>
   import { onMount } from 'svelte';
 
-let order = { workorder: '' };
-  let sequenceCounter = 1;
+  export let data;
 
-  function getCurrentWorkorderPrefix() {
-    const now = new Date();
-    const year = now.getFullYear().toString().slice(-2);
-    const start = new Date(now.getFullYear(), 0, 1);
-    const days = Math.floor((now - start) / (24 * 60 * 60 * 1000));
-    const week = Math.ceil((days + start.getDay() + 1) / 7);
-    return `${year}${String(week).padStart(2, '0')}`;
-  }
+  const now = new Date();
+  const todayFormatted = `${String(now.getMonth() + 1).padStart(2, '0')}/${String(now.getDate()).padStart(2, '0')}/${now.getFullYear()}`;
+  const today = now.toISOString().split('T')[0];
 
-  function generateWorkorderNumber(seq = 1) {
-    const prefix = getCurrentWorkorderPrefix();
-    const padded = String(seq).padStart(4, '0');
-    return `${prefix}${padded}`;
-  }
-
-
-  
-onMount(() => {
-  const generated = generateWorkorderNumber(++sequenceCounter);
-  console.log("Generated on mount:", generated);
-  order.workorder = generated;
-  order.receivedDate = todayFormatted;
-});
+  let order = {
+    workorder: data.workorder,
+    receivedDate: todayFormatted,
+    shipping: '',
+    neededDate: ''
+  };
 
   let patient = {
     name: '', facility: '', account: '',
@@ -34,73 +20,89 @@ onMount(() => {
     sex: '', activity: '', side: [], email: '', phone: ''
   };
 
-  let now = new Date();
-  let todayFormatted = `${String(now.getMonth() + 1).padStart(2, '0')}/${String(now.getDate()).padStart(2, '0')}/${now.getFullYear()}`;
-  let today = now.toISOString().split('T')[0];
   let liner = { type: '', size: '', thickness: '' };
   let foot = { type: '', size: '' };
   let uploadedFile = null;
   let canSubmit = false;
+  let uploadedFileName = '';
 
   let errors = {
-    name: false, practitioner: false, email: false, phone: false, activity: false, side: false,
-    shipping: false, neededDate: false, receivedDate: false, file: false
+    name: false, practitioner: false, email: false, phone: false,
+    activity: false, side: false, shipping: false,
+    neededDate: false, receivedDate: false, file: false
   };
 
   function checkFormValidity() {
-    const requiredFields = [
-      patient.name,
-      patient.practitioner,
-      patient.email,
-      patient.phone,
-      patient.activity,
-      patient.side,
-      patient.age,
-      order.shipping,
-      order.neededDate,
-      order.receivedDate
+    const required = [
+      patient.name, patient.practitioner, patient.email,
+      patient.phone, patient.activity, patient.side, patient.age,
+      order.shipping, order.neededDate, order.receivedDate
     ];
 
-    canSubmit = requiredFields.every(field =>
-      (typeof field === 'string' && field.trim() !== '') || (Array.isArray(field) && field.length > 0)
+    canSubmit = required.every(f =>
+      (typeof f === 'string' && f.trim() !== '') ||
+      (Array.isArray(f) && f.length > 0)
     );
   }
 
+  async function handleSubmit() {
+    checkFormValidity();
 
- async function handleSubmit() {
-  checkFormValidity();
-
-  if (!canSubmit) {
-    alert("Please fill out all required fields.");
-    return;
-  }
-
-  try {
-    const response = await fetch('/api/submit-order', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ patient, order, liner, foot })
-    });
-
-    const result = await response.json();
-
-    if (response.ok && result.success) {
-      order.workorder = result.workorder; // server-supplied
-      alert(`Order ${order.workorder} submitted successfully!`);
-      window.location.href = '/customers/orders/outstanding'; // ✅ Redirect here
-    } else {
-      alert("Submission failed.");
+    if (!canSubmit || !uploadedFile) {
+      alert("Please fill out all required fields and upload a file.");
+      return;
     }
 
-  } catch (error) {
-    console.error("Submission error:", error);
-    alert("An error occurred during submission.");
+    try {
+      // ✅ Dynamically import html2canvas only on client
+      const { default: html2canvas } = await import('html2canvas');
+
+      // ✅ Sanitize unsupported CSS colors
+      document.querySelectorAll('#print-area *').forEach(el => {
+        const style = getComputedStyle(el);
+        ['color', 'backgroundColor', 'borderColor'].forEach(prop => {
+          if (style[prop]?.includes('oklch')) el.style[prop] = '#000';
+        });
+      });
+
+      // ✅ Generate high-quality JPG
+      const element = document.getElementById('print-area');
+      const canvas = await html2canvas(element, {
+        scale: 3,
+        useCORS: true
+      });
+
+      const jpgBlob = await new Promise(resolve =>
+        canvas.toBlob(resolve, 'image/jpeg', 0.95)
+      );
+
+      const formData = new FormData();
+      formData.append('file', uploadedFile);
+      formData.append('printFile', jpgBlob, 'printable.jpg');
+      formData.append('order', JSON.stringify(order));
+      formData.append('patient', JSON.stringify(patient));
+      formData.append('liner', JSON.stringify(liner));
+      formData.append('foot', JSON.stringify(foot));
+
+      const res = await fetch('/api/submit-order', {
+        method: 'POST',
+        body: formData
+      });
+
+      const result = await res.json();
+
+      if (res.ok && result.success) {
+        alert(`Order ${result.workorder} submitted successfully!`);
+        window.location.href = '/customers/orders';
+      } else {
+        alert("Submission failed.");
+      }
+
+    } catch (error) {
+      console.error("❌ Submission error:", error);
+      alert("An error occurred during submission.");
+    }
   }
-}
-
-
-
-
 </script>
 
 
@@ -247,7 +249,12 @@ onMount(() => {
       font-weight: bold !important;
     }
   }
-
+  #print-area {
+      transform: scale(1); /* no scaling tricks */
+      overflow: hidden;
+      -webkit-print-color-adjust: exact;
+      print-color-adjust: exact;
+    }
   @media screen and (max-width: 640px) {
     #form-wrapper {
       transform: scale(0.95);
@@ -267,31 +274,45 @@ onMount(() => {
       width: 100% !important;
     }
   }
+  
 
 </style>
 
 <!-- File Upload Input -->
- <div id=" fullPage" class="h-490 bg-gradient-to-b from-black/60 via-gray-900/50 to-black/60  p-8">
-<div class="mt-4 no-print flex justify-center border-2 border-[#f58220] w-[65%] bg-white p-4 mx-auto rounded">
-  <div class="flex flex-col items-center w-full max-w-sm">
-    <label for="fileUpload" class={`text-xl text-[#f58220] font-bold mb-2 text-center  ${errors.file ? 'border-2 border-red-500' : ''}`}>
-      Upload File:
-    </label>
-    <input
-      id="fileUpload"
-      type="file"
-      required
-      on:change={(e) => uploadedFile = e.target.files[0]}
-      class="block w-full text-sm text-gray-700 border border-gray-300 rounded py-2 px-3"
-    />
+<div id="fullPage" class="h-490 bg-gradient-to-b from-black/60 via-gray-900/50 to-black/60 p-8">
+  <div class="mt-4 no-print flex justify-center border-2 border-[#f58220] w-[65%] bg-white p-4 mx-auto rounded">
+    <div class="flex flex-col items-center w-full max-w-sm">
+      <label
+        for="fileUpload"
+        class={`text-xl text-[#f58220] font-bold mb-2 text-center ${errors.file ? 'border-2 border-red-500' : ''}`}
+      >
+        Upload File:
+      </label>
+
+      <!-- ✅ Custom label area -->
+      {#if uploadedFileName}
+        <p class="text-sm font-bold text-green-700 mb-2">{uploadedFileName}</p>
+      {/if}
+
+      <input
+        id="fileUpload"
+        type="file"
+        required
+        on:change={(e) => {
+          uploadedFile = e.target.files[0];
+          uploadedFileName = uploadedFile?.name || '';
+        }}
+        class="block w-full text-sm text-gray-700 border border-gray-300 rounded py-2 px-3 file:opacity-0 file:absolute file:h-0"
+      />
+    </div>
   </div>
-</div>
 
 <!-- start of form -->
 
 <div id="form-wrapper" class="scale-[1.2] origin-top w-[1100px] p-8 mx-auto mt-5 print:mt-[-90px] bg-white">
 
-<div id="print-area">
+<div id="print-area" class="bg-white text-black text-[12px] leading-tight">
+
   <div id="print-header" class="print:scale-[0.85] print:origin-top-left px-4 print:px-2 pt-2 border-b-2 border-black flex justify-between items-center">
   <img
   id="logo"
