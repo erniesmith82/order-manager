@@ -33,6 +33,15 @@
     "preferences": {
       "notifications": true,
       "defaultExport": "PDF"
-    }
+    },
+    "facilities": [
+      {
+        "name": "",
+        "address": "4505 NW 165 ST",
+        "city": "MIAMI GARDENS",
+        "state": "FL",
+        "zip": "33054"
+      }
+    ]
   }
 ]

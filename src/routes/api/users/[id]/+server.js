@@ -1,3 +1,5 @@
+// src/routes/api/users/[id]/+server.js
+
 import fs from 'fs/promises';
 import path from 'path';
 
@@ -38,6 +40,7 @@ export async function PUT({ params, request }) {
     });
   }
 
+  // Merge updated data into existing user
   users[index] = { ...users[index], ...updatedData };
   await writeUsers(users);
 

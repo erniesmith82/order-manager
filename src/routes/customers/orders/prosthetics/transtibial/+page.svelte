@@ -1,6 +1,7 @@
 <script>
   import { onMount } from 'svelte';
-
+import PrintOrderSummary from '$lib/components/PrintOrderSummary.svelte';
+  
   export let data;
 
   const now = new Date();
@@ -45,32 +46,31 @@
     );
   }
 
-  async function handleSubmit() {
-    checkFormValidity();
+ async function handleSubmit() {
+  checkFormValidity();
 
-    if (!canSubmit || !uploadedFile) {
-      alert("Please fill out all required fields and upload a file.");
-      return;
-    }
+  if (!canSubmit || !uploadedFile) {
+    alert("Please fill out all required fields and upload a file.");
+    return;
+  }
 
-    try {
-      // ✅ Dynamically import html2canvas only on client
+  try {
+    // ✅ Only on client
+    if (typeof window !== 'undefined') {
       const { default: html2canvas } = await import('html2canvas');
 
-      // ✅ Sanitize unsupported CSS colors
-      document.querySelectorAll('#print-area *').forEach(el => {
-        const style = getComputedStyle(el);
-        ['color', 'backgroundColor', 'borderColor'].forEach(prop => {
-          if (style[prop]?.includes('oklch')) el.style[prop] = '#000';
-        });
+      const cleanElement = document.getElementById('print-clean');
+      if (!cleanElement) throw new Error('#print-clean not found');
+
+      cleanElement.classList.remove('hidden');
+
+      const canvas = await html2canvas(cleanElement, {
+        scale: 3,
+        useCORS: true,
+        backgroundColor: '#fff'
       });
 
-      // ✅ Generate high-quality JPG
-      const element = document.getElementById('print-area');
-      const canvas = await html2canvas(element, {
-        scale: 3,
-        useCORS: true
-      });
+      cleanElement.classList.add('hidden');
 
       const jpgBlob = await new Promise(resolve =>
         canvas.toBlob(resolve, 'image/jpeg', 0.95)
@@ -97,12 +97,13 @@
       } else {
         alert("Submission failed.");
       }
-
-    } catch (error) {
-      console.error("❌ Submission error:", error);
-      alert("An error occurred during submission.");
     }
+  } catch (error) {
+    console.error("❌ Submission error:", error);
+    alert("An error occurred during submission.");
   }
+}
+
 </script>
 
 
@@ -607,3 +608,11 @@
 </div>
 </div>
 </div>
+<!-- ✅ Hidden clean layout for JPG generation -->
+<PrintOrderSummary
+  {order}
+  {patient}
+  {liner}
+  {foot}
+/>
+

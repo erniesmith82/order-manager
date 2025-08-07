@@ -52,11 +52,11 @@ export async function POST({ request }) {
     }
 
     // ✅ Save generated JPG of order form
-    if (printFile && typeof printFile.arrayBuffer === 'function') {
-      const printBuffer = Buffer.from(await printFile.arrayBuffer());
-      const printPath = path.join(folderPath, 'printable.jpg'); // ✅ FIXED extension
-      fs.writeFileSync(printPath, printBuffer);
-    }
+if (printFile && typeof printFile.arrayBuffer === 'function') {
+  const printBuffer = Buffer.from(await printFile.arrayBuffer());
+  const printPath = path.join(folderPath, 'printable.jpg'); // <-- updated to .jpg
+  fs.writeFileSync(printPath, printBuffer);
+}
 
     // ✅ Respond with success and workorder number
     return new Response(JSON.stringify({ success: true, workorder }), {
