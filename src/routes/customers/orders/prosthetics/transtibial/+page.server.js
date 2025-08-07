@@ -1,16 +1,28 @@
 // /src/routes/customers/orders/prosthetics/transtibial/+page.js
+import fs from 'fs/promises';
+import path from 'path';
 
-// src/routes/customers/orders/prosthetics/transtibial/+page.js
 export async function load({ fetch }) {
+  // Get workorder number
   const res = await fetch('/api/next-workorder');
   const { workorder } = await res.json();
 
+  // Load user info from static/data/users.json
+  const filePath = path.resolve('static/data/users.json');
+  const raw = await fs.readFile(filePath, 'utf-8');
+  const users = JSON.parse(raw);
+
+  // Simulate "logged in" user — update this logic later
+  const user = users.find(u => u.role === 'customer' && u.facilities);
+
+
   return {
-    workorder
+    workorder,
+    user
   };
 }
 
-// Helper to get ISO week number
+// Helper to get ISO week number (not used in load, can be removed or reused later)
 function getISOWeek(date) {
   const tempDate = new Date(date.getTime());
   tempDate.setHours(0, 0, 0, 0);
@@ -19,8 +31,7 @@ function getISOWeek(date) {
   return 1 + Math.round(((tempDate - week1) / 86400000 - 3 + ((week1.getDay() + 6) % 7)) / 7);
 }
 
-// This could hit an endpoint, read from file, or count folders
+// Optional placeholder
 async function getNextOrderNumber(year, week) {
-  // Fallback default
-  return '0001'; // Placeholder, you should hook this into your logic or endpoint
+  return '0001';
 }

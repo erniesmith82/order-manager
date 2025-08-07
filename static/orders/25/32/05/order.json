@@ -3,16 +3,18 @@
     "workorder": "25320005",
     "receivedDate": "08/06/2025",
     "shipping": "FedEx Standard Overnight",
-    "neededDate": "2025-08-20"
+    "neededDate": "2025-08-20",
+    "uploadedFileName": "Transtibial(1)_Form.jpg",
+    "product": "Transtibial Socket"
   },
   "patient": {
-    "name": "fsdfhasdf",
-    "facility": "fdasdfsdgf",
-    "account": "sdgfsdgf",
-    "height": "wsadf",
+    "name": "Arles Aviles",
+    "facility": "Finnieston Clinic",
+    "account": "5552424",
+    "height": "5'7",
     "weight": "f",
     "age": "sdff",
-    "practitioner": "sdgfsdfgsd",
+    "practitioner": "Adam Finnieston",
     "sex": "sfasf",
     "activity": "asfasf",
     "side": [

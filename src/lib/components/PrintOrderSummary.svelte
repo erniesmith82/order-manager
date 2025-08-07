@@ -2,77 +2,174 @@
   export let showPrintClean = true;
   export let order;
   export let patient;
-  export let liner;
-  export let foot;
-  export let uploadedFileName = ''; // 👈 This is safe now
+  export let uploadedFileName = ''; 
 </script>
 
-<div
-  id="print-clean"
-  class:hidden={!showPrintClean}
-  class="print-clean bg-white text-black border px-10 py-8 text-sm leading-tight"
->
-  <div class="flex justify-between items-center border-b pb-2 mb-4">
-    <div>
-      <p><strong>Customer PO:</strong> {patient.name}</p>
-      <p><strong>Patient Name:</strong> {patient.name}</p>
-      <p><strong>Patient ID:</strong> {patient.account}</p>
-      <p><strong>Practitioner:</strong> {patient.practitioner}</p>
+<style>
+  @media print {
+    @page {
+      size: 8.5in 11in;
+      margin: 0.5in;
+    }
+
+    html, body {
+      margin: 0;
+      padding: 0;
+      width: 100%;
+      height: 100%;
+    }
+
+    .print-container {
+      width: 100%;
+      height: 100%;
+      box-sizing: border-box;
+      padding: 0;
+      margin: 0;
+      page-break-after: always;
+    }
+
+    body * {
+      visibility: hidden;
+    }
+
+    #print-summary, #print-summary * {
+      visibility: visible;
+    }
+
+    #print-summary {
+      position: absolute;
+      top: 0;
+      left: 0;
+    }
+  }
+</style>
+
+<div class="border p-10">
+
+<div id="print-summary" class="print-container bg-white text-black text-sm leading-tight">
+
+
+ <div class="header pb-10 text-2xl font-bold">
+      Order Summary
+ </div>
+<div class="flex justify-between border-b-2 pb-10 pt-05 mb-4">
+  <!-- Left Column -->
+ <div class="grid text-left items-start gap-y-1">
+  <div class="grid grid-cols-[auto_1fr] gap-x-2">
+    <strong class="text-left">Customer PO:</strong><span>{patient.name}</span>
+  </div>
+  <div class="grid grid-cols-[auto_1fr] gap-x-2">  
+     <strong class="text-left">Patient Name:</strong> {patient.name}
+  </div>
+  <div class="grid grid-cols-[auto_1fr] gap-x-2">   
+     <strong class="text-left">Customer Account:</strong> {patient.account}
+  </div>   
+  <div class="grid grid-cols-[auto_1fr] gap-x-2">   
+     <strong class="text-left">Practitioner:</strong> {patient.practitioner}
+  </div>
+   <div class="grid grid-cols-[auto_1fr] gap-x-2">   
+     <strong class="text-left">Practitioner:</strong> {patient.practitioner}
+  </div>
+ </div>
+<!-- Right Column as Grid -->
+<div class="grid text-right items-start gap-y-1">
+  <div class="grid grid-cols-[auto_1fr] gap-x-2">
+    <strong class="text-right">Order:</strong><span class="font-bold">{order.workorder}</span>
+  </div>
+  <div class="grid grid-cols-[auto_1fr] gap-x-2">
+    <strong class="text-right">Date Needed:</strong><span>{order.neededDate}</span>
+  </div>
+  <div class="grid grid-cols-[auto_1fr] gap-x-2">
+    <strong class="text-right">Ship Date:</strong><span>{order.neededDate}</span>
+  </div>
+  <div class="grid grid-cols-[auto_1fr] gap-x-2">
+    <strong class="text-right">Delivery Date:</strong><span>{order.neededDate}</span>
+  </div>
+   <div class="grid grid-cols-[auto_1fr] gap-x-2">   
+     <strong class="text-left">Date Submitted:</strong><span>{order.receivedDate}</span>
+  </div>
+  
+</div>
+
+</div>
+
+<!-- Shipping and Billing -->
+
+  <div class="flex justify-between border-b-2 pb-10 mb-4">
+ <div>
+  <div class="grid grid-cols-[auto_1fr] gap-x-2"> 
+      <strong>Order Type:</strong><span>Standard</span>
+  </div>
+      <div class="grid grid-cols-[auto_1fr] gap-x-2">  
+        <strong>Ship Method:</strong><span>{order.shipping}</span>
+      </div>
     </div>
-    <div class="text-right">
-      <p class="text-xl font-bold">Order Cover Page</p>
-      <p><strong>Order:</strong> {order.workorder}</p>
-      <p><strong>Date Needed:</strong> {order.neededDate}</p>
-      <p><strong>Ship Date:</strong> {order.neededDate}</p>
-      <p><strong>Delivery Date:</strong> {order.neededDate}</p>
+  </div>
+<div class="grid grid-cols-2 gap-6 border-b-2 pb-10 mb-4">
+  <!-- Bill To -->
+  <div>
+    <div class="flex items-start gap-4">
+      <strong class="min-w-[80px]">Bill to:</strong>
+     {#if patient.facilityDetails}
+      <div class="leading-tight">
+        <p>{patient.facilityDetails.name}</p>
+        <p>{patient.facilityDetails.address}</p>
+        <p>{patient.facilityDetails.city}, {patient.facilityDetails.state} {patient.facilityDetails.zip}</p>
+        <p>{patient.email}</p> 
+      </div>
+      {/if}
     </div>
   </div>
 
-  <div class="flex justify-between items-center border-b pb-2 mb-4">
-    <p><strong>Created By:</strong> Auto-Generated</p>
-    <p><strong>Date Submitted:</strong> {order.receivedDate}</p>
-  </div>
+  <!-- Ship To -->
+  <div>
+    <div class="flex items-start gap-4">
+  <strong class="min-w-[80px]">Ship to:</strong>
+  {#if patient.facilityDetails}
+    <div class="leading-tight">
+      <p>{patient.facilityDetails.name}</p>
+      <p>{patient.facilityDetails.address}</p>
+      <p>{patient.facilityDetails.city}, {patient.facilityDetails.state} {patient.facilityDetails.zip}</p>
+      <p>{patient.email}</p>
+    </div>
+  {/if}
+</div>
 
-  <div class="grid grid-cols-2 gap-6 border-b pb-4 mb-4">
-    <div>
-      <p><strong>Order Type:</strong> Standard</p>
-      <p><strong>Ship Method:</strong> Site Pickup</p>
-    </div>
-    <div>
-      <p><strong>Bill To:</strong></p>
-      <p>SPS National Labs Orlando</p>
-      <p>9561 SATELLITE BLVD.<br />SUITE 350<br />Orlando, FL 32837-8425</p>
-      <p>407-852-6170</p>
-    </div>
-    <div>
-      <p><strong>Ship To:</strong></p>
-      <p>SPS National Labs Orlando</p>
-      <p>9561 SATELLITE BLVD.<br />SUITE 350<br />Orlando, FL 32837-8425</p>
-      <p>407-852-6170</p>
-    </div>
   </div>
+</div>
 
-  <div class="border-b pb-2 mb-4">
-    <p><strong>Product:</strong> Send File to Mill</p>
+<!-- Product-->
+ 
+    
+    <div class="flex justify-between border-b-2 pb-10 mb-4">
+      <div>
+      <div class="grid grid-cols-[auto_1fr] gap-x-2">
+   <strong>Product:</strong><span>{order.product}</span>
+     </div>
+      <div class="grid grid-cols-[auto_1fr] gap-x-2">
     <p><strong>Quantity:</strong> 1</p>
-    <p><strong>Order Form:</strong> {uploadedFileName}</p>
+      </div>
+    </div>
+    </div>
+  
+
+  <div class="border-b-2 pb-10 pt-5 mb-4 text-left">
+    <p><strong>Order Form:</strong></p>
+    <p><strong>Order File:</strong> {order.uploadedFileName}</p>
   </div>
 
-  <div class="border-b pb-2 mb-4">
-    <p><strong>Order File:</strong></p>
-    <p>GREEN BERNARD CONVERTED RKAFO 250730 mfmod carve(20250806_1238).op3</p>
-    <p>GREEN BERNARD CONVERTED LKAFO 250730 mfmod carve(20250806_1238).op3</p>
-  </div>
+<!-- Comment section with hex-safe color -->
+<div class="border-b-2 pb-20 mb-4 text-left">
+  <p><strong>Comment:</strong></p>
+  <p class="italic" style="color: #4b5563;">{order.comment || 'None'}</p>
 
-  <div class="border-b pb-2 mb-4">
-    <p><strong>Comment:</strong></p>
-    <p class="text-gray-600 italic">None</p>
-  </div>
+</div>
 
-  <div class="text-center text-xs mt-6">
-    <p><strong>BioSculptor Fabrication</strong></p>
-    <p>2480 West 82nd Street, Hialeah FL 33016</p>
-    <p>305-823-8300 | 305-823-8304 | cfab@biosculptor.com</p>
-    <p class="mt-2">Page 01</p>
+  <div class="text-center pt-15 text-xs mt-6">
+    <p class="fon-bold text-lg"><strong>BioSculptor Fabrication</strong></p>
+   <p class="mt-2 text-sm">
+      2480 West 82nd Street | Hialeah, FL 33016 | 305.823.8300 | 877.246.2884 | www.biosculptor.com
+    </p>
   </div>
+</div>
 </div>

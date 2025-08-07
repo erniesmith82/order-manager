@@ -1,38 +1,53 @@
 <script>
   import { onMount } from 'svelte';
-import PrintOrderSummary from '$lib/components/PrintOrderSummary.svelte';
-  
+  import PrintOrderSummary from '$lib/components/PrintOrderSummary.svelte';
+
   export let data;
 
+  // User info
+  let user = data?.user ?? { facilities: [] };
+  let workorder = data.workorder;
+
+  // File state
+  let uploadedFile = null;
+  let uploadedFileName = '';
+
+  // Date setup
   const now = new Date();
   const todayFormatted = `${String(now.getMonth() + 1).padStart(2, '0')}/${String(now.getDate()).padStart(2, '0')}/${now.getFullYear()}`;
   const today = now.toISOString().split('T')[0];
 
+  // Order object
   let order = {
     workorder: data.workorder,
     receivedDate: todayFormatted,
     shipping: '',
-    neededDate: ''
+    neededDate: '',
+    uploadedFileName: '',
+    product: 'Transtibial Socket',
+    comment: ''
   };
 
+  // Patient details
   let patient = {
     name: '', facility: '', account: '',
     height: '', weight: '', age: '', practitioner: '',
     sex: '', activity: '', side: [], email: '', phone: ''
   };
 
+  // Misc
   let liner = { type: '', size: '', thickness: '' };
   let foot = { type: '', size: '' };
-  let uploadedFile = null;
   let canSubmit = false;
-  let uploadedFileName = '';
 
+  // Validation tracking
   let errors = {
     name: false, practitioner: false, email: false, phone: false,
     activity: false, side: false, shipping: false,
     neededDate: false, receivedDate: false, file: false
   };
 
+  // ✅ Step 1: Validate required fields
   function checkFormValidity() {
     const required = [
       patient.name, patient.practitioner, patient.email,
@@ -46,66 +61,81 @@ import PrintOrderSummary from '$lib/components/PrintOrderSummary.svelte';
     );
   }
 
- async function handleSubmit() {
-  checkFormValidity();
+  // 📤 Step 2: Submit form with JPG + PDF capture
+  async function handleSubmit() {
+    checkFormValidity();
 
-  if (!canSubmit || !uploadedFile) {
-    alert("Please fill out all required fields and upload a file.");
-    return;
-  }
-
-  try {
-    // ✅ Only on client
-    if (typeof window !== 'undefined') {
-      const { default: html2canvas } = await import('html2canvas');
-
-      const cleanElement = document.getElementById('print-clean');
-      if (!cleanElement) throw new Error('#print-clean not found');
-
-      cleanElement.classList.remove('hidden');
-
-      const canvas = await html2canvas(cleanElement, {
-        scale: 3,
-        useCORS: true,
-        backgroundColor: '#fff'
-      });
-
-      cleanElement.classList.add('hidden');
-
-      const jpgBlob = await new Promise(resolve =>
-        canvas.toBlob(resolve, 'image/jpeg', 0.95)
-      );
-
-      const formData = new FormData();
-      formData.append('file', uploadedFile);
-      formData.append('printFile', jpgBlob, 'printable.jpg');
-      formData.append('order', JSON.stringify(order));
-      formData.append('patient', JSON.stringify(patient));
-      formData.append('liner', JSON.stringify(liner));
-      formData.append('foot', JSON.stringify(foot));
-
-      const res = await fetch('/api/submit-order', {
-        method: 'POST',
-        body: formData
-      });
-
-      const result = await res.json();
-
-      if (res.ok && result.success) {
-        alert(`Order ${result.workorder} submitted successfully!`);
-        window.location.href = '/customers/orders';
-      } else {
-        alert("Submission failed.");
-      }
+    if (!canSubmit || !uploadedFile) {
+      alert("Please fill out all required fields and upload a file.");
+      return;
     }
-  } catch (error) {
-    console.error("❌ Submission error:", error);
-    alert("An error occurred during submission.");
+
+    try {
+      if (typeof window !== 'undefined') {
+        const { default: html2canvas } = await import('html2canvas');
+        const html2pdf = (await import('html2pdf.js')).default;
+
+        // 🔍 Select clean order summary element (JPG)
+        const cleanElement = document.getElementById('print-clean');
+        cleanElement.classList.remove('hidden');
+
+        const canvas = await html2canvas(cleanElement, {
+          scale: 3,
+          useCORS: true,
+          backgroundColor: '#fff'
+        });
+
+        const jpgBlob = await new Promise(resolve =>
+          canvas.toBlob(resolve, 'image/jpeg', 0.95)
+        );
+
+        cleanElement.classList.add('hidden');
+
+        // 🔍 Select printable summary element (PDF)
+        const summaryElement = document.getElementById('print-summary');
+        const pdfBlob = await html2pdf().from(summaryElement).set({
+          margin: 0.5,
+          filename: 'Transtibial_Socket_Summary.pdf',
+          image: { type: 'jpeg', quality: 0.98 },
+          html2canvas: { scale: 2 },
+          jsPDF: { unit: 'in', format: 'letter', orientation: 'portrait' }
+        }).outputPdf('blob');
+
+        // ✅ Store filename and product info
+        uploadedFileName = uploadedFile.name;
+        order.uploadedFileName = uploadedFileName;
+        order.product = 'Transtibial Socket';
+
+        // 📨 Build submission payload
+        const formData = new FormData();
+        formData.append('file', uploadedFile);
+        formData.append('printFile', jpgBlob, 'printable.jpg');
+        formData.append('printSummary', pdfBlob, 'print-summary.pdf');
+        formData.append('order', JSON.stringify(order));
+        formData.append('patient', JSON.stringify(patient));
+        formData.append('liner', JSON.stringify(liner));
+        formData.append('foot', JSON.stringify(foot));
+
+        const res = await fetch('/api/submit-order', {
+          method: 'POST',
+          body: formData
+        });
+
+        const result = await res.json();
+
+        if (res.ok && result.success) {
+          alert(`✅ Order ${result.workorder} submitted successfully!`);
+          window.location.href = '/customers/orders';
+        } else {
+          alert("❌ Submission failed.");
+        }
+      }
+    } catch (error) {
+      console.error("❌ Submission error:", error);
+      alert("An error occurred during submission.");
+    }
   }
-}
-
 </script>
-
 
 <style global>
   @media print {
@@ -113,38 +143,38 @@ import PrintOrderSummary from '$lib/components/PrintOrderSummary.svelte';
       size: 8.5in 11in;
       margin: 0;
     }
-      select {
-      appearance: none;
+  #print-clean {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 8.5in;
+  height: 11in;
+  padding: 0.4in;
+  box-sizing: border-box;
+  transform: scale(1);
+  overflow: hidden;
+}
+
+    input,
+    textarea,
+    select {
+      border: none !important;
+      background: transparent !important;
+      font-weight: bold !important;
+      font-size: inherit !important;
+      color: #000 !important;
+    }
+
+    input[type="date"]::-webkit-calendar-picker-indicator {
+      display: none;
       -webkit-appearance: none;
-      -moz-appearance: none;
+    }
+
+    input[type="date"] {
       background: none;
-      padding-right: 0;
-      font-size: 10pt !important;
-      text-overflow: clip;
     }
 
-    option {
-      font-size: 10pt;
-    }
-  
-  /* Remove calendar icon (Chrome, Edge, Safari) */
-  input[type="date"]::-webkit-calendar-picker-indicator {
-    display: none;
-    -webkit-appearance: none;
-  }
 
-  /* Optional: remove background icon space */
-  input[type="date"] {
-    background: none;
-  }
-    input[type="checkbox"] {
-      appearance: none;
-      -webkit-appearance: none;
-      width: 12px;
-      height: 12px;
-      border: 1px solid black;
-      position: relative;
-    }
 
     input[type="checkbox"]:checked::before {
       content: "✔";
@@ -154,58 +184,6 @@ import PrintOrderSummary from '$lib/components/PrintOrderSummary.svelte';
       left: 1px;
     }
 
-    html, body {
-      margin: 0;
-      padding: 0;
-      font-size: 10px;
-      -webkit-print-color-adjust: exact;
-      print-color-adjust: exact;
-    }
-
-    body * {
-      visibility: hidden;
-    }
-
-    .no-print,
-    aside,
-    nav,
-    .sidebar,
-    .layout-nav {
-      display: none !important;
-      visibility: hidden !important;
-    }
-
-    #form-wrapper,
-    #form-wrapper * {
-      visibility: visible;
-    }
-
-    #form-wrapper {
-       position: absolute;
-  top: 45px;
-  left: 0;
-  width: 8.5in;
-  padding: 0.4in;
-  box-sizing: border-box;
-  transform: scale(0.85);
-  margin-left: 40px;
-  margin-right: 40px;
-  
-}
- #measurementB{
-   left: 51.5%;
-   top: 51%;
- }
-
-  #measurementA{
-   left: 85.5%;
-   top: 49%;
- }
-
-  #measurementD{
-   left: 59%;
-   top: 59.5%;
- }
     #logo {
       height: 250px !important;
       max-width: 100% !important;
@@ -217,70 +195,34 @@ import PrintOrderSummary from '$lib/components/PrintOrderSummary.svelte';
       margin-top: -125px !important;
     }
 
-    #print-header {
-      width: 118% !important;
-      height: 80px !important;
-      margin-top: 70px !important;
-      padding: 6px 8px 4px 8px !important;
-      align-items: center !important;
-    }
 
-    #print-header-title {
-      font-size: 24px !important;
-      text-align: right !important;
-    }
-
-    #print-header-subtitle {
-      font-size: 18px !important;
-      text-align: right !important;
-    }
-
-    #print-shrink,
-    #print-shrink * {
-      font-size: 94% !important;
-    }
 
     #notes {
       margin-top: -1rem !important;
     }
 
-    input, textarea, select {
-      border: none !important;
-      background: transparent !important;
-      font-weight: bold !important;
-    }
-  }
-  #print-area {
-      transform: scale(1); /* no scaling tricks */
-      overflow: hidden;
-      -webkit-print-color-adjust: exact;
-      print-color-adjust: exact;
-    }
-  @media screen and (max-width: 640px) {
-    #form-wrapper {
-      transform: scale(0.95);
-    }
-    #print-header {
-      flex-direction: column;
-      text-align: center;
-    }
-    #print-shrink input,
-    #print-shrink textarea {
-      font-size: 0.875rem;
-    }
-    .flex {
-      flex-direction: column;
-    }
-    .w-1\/2, .w-1\/3, .w-1\/4, .w-1\/5, .w-1\/6 {
-      width: 100% !important;
-    }
-  }
-  
+    #measurementB { left: 51.5%; top: 51%; }
+    #measurementA { left: 85.5%; top: 49%; }
+    #measurementD { left: 59%; top: 59.5%; }
 
+    body * {
+  visibility: hidden;
+}
+
+.no-print,
+aside,
+nav,
+.sidebar,
+.layout-nav {
+  display: none !important;
+  visibility: hidden !important;
+}
+
+  }
 </style>
 
 <!-- File Upload Input -->
-<div id="fullPage" class="h-490 bg-gradient-to-b from-black/60 via-gray-900/50 to-black/60 p-8">
+<div id="fullPage" class="h-490 bg-gradient-to-b from-[rgba(0,0,0,0.6)] via-[rgba(55,65,81,0.5)] to-[rgba(0,0,0,0.6)] p-8">
   <div class="mt-4 no-print flex justify-center border-2 border-[#f58220] w-[65%] bg-white p-4 mx-auto rounded">
     <div class="flex flex-col items-center w-full max-w-sm">
       <label
@@ -291,10 +233,9 @@ import PrintOrderSummary from '$lib/components/PrintOrderSummary.svelte';
       </label>
 
       <!-- ✅ Custom label area -->
-      {#if uploadedFileName}
-        <p class="text-sm font-bold text-green-700 mb-2">{uploadedFileName}</p>
-      {/if}
-
+  {#if order.uploadedFileName}
+  <p class="text-sm font-bold text-[rgba(21,128,61,1)] mb-2">{order.uploadedFileName}</p>
+{/if}
       <input
         id="fileUpload"
         type="file"
@@ -303,18 +244,18 @@ import PrintOrderSummary from '$lib/components/PrintOrderSummary.svelte';
           uploadedFile = e.target.files[0];
           uploadedFileName = uploadedFile?.name || '';
         }}
-        class="block w-full text-sm text-gray-700 border border-gray-300 rounded py-2 px-3 file:opacity-0 file:absolute file:h-0"
+        class="block w-full text-sm text-[rgba(55,65,81,1)] border border-[rgba(209,213,219,1)] rounded py-2 px-3 file:opacity-0 file:absolute file:h-0"
       />
     </div>
   </div>
 
 <!-- start of form -->
+<div  id="print-area" >
+<div id="form-wrapper" class="scale-[1.2] origin-top w-[1100px] p-15 mx-auto mt-3 print:mt-[-90px] bg-white">
 
-<div id="form-wrapper" class="scale-[1.2] origin-top w-[1100px] p-8 mx-auto mt-5 print:mt-[-90px] bg-white">
+<div class="bg-white text-black text-[12px] leading-tight">
 
-<div id="print-area" class="bg-white text-black text-[12px] leading-tight">
-
-  <div id="print-header" class="print:scale-[0.85] print:origin-top-left px-4 print:px-2 pt-2 border-b-2 border-black flex justify-between items-center">
+  <div  class="print:scale-[0.85] print:origin-top-left px-4 print:px-2 pt-2 border-b-2 border-black flex justify-between items-center">
   <img
   id="logo"
     src="/BiosculptorFabrications.png"
@@ -407,8 +348,23 @@ import PrintOrderSummary from '$lib/components/PrintOrderSummary.svelte';
       <input bind:value={patient.name} required on:input={checkFormValidity} class={`w-full h-full ${errors.name ? 'border-2 border-red-500' : ''}`}  />
     </div>
     <div class="border border-gray-400 p-2 w-[33%] h-12">
-      <label class="block text-xs font-semibold -mt-2">Facility</label>
-      <input bind:value={patient.facility} class="w-full h-full" />
+{#if user?.facilities?.length}
+  <label class="block text-xs font-semibold -mt-2">Facility</label>
+  <select
+    bind:value={patient.facility}
+    class="w-full h-full border border-gray-300 rounded p-1 text-sm"
+  >
+    <option value="" disabled selected>Select a facility</option>
+
+    {#each user.facilities as facility}
+      <option value={facility.name}>{facility.name}</option>
+    {/each}
+  </select>
+{:else}
+  <p class="text-sm italic text-gray-500">No facilities found</p>
+{/if}
+
+
     </div>
     <div class="border border-gray-400 p-2 w-[28%] h-12">
       <label class="block text-xs font-semibold -mt-2">Account Number</label>
@@ -578,10 +534,11 @@ import PrintOrderSummary from '$lib/components/PrintOrderSummary.svelte';
     <h3 class="text-2xl font-bold text-[#f58220] border-b pb-1">Notes and Modification Instructions</h3>
     <div class="border border-dashed border-gray-400 h-24 p-2 mt-1 text-sm">
       <textarea
-      rows="4"
-      placeholder="Enter notes or modification instructions here..."
-      class="w-full h-full resize-none outline-none bg-transparent"
-    ></textarea>
+  rows="4"
+  placeholder="Enter notes or modification instructions here..."
+  bind:value={order.comment}
+  class="w-full h-full resize-none outline-none bg-transparent"
+/>
     </div>
   </div>
 </div>
@@ -608,11 +565,21 @@ import PrintOrderSummary from '$lib/components/PrintOrderSummary.svelte';
 </div>
 </div>
 </div>
+</div>
 <!-- ✅ Hidden clean layout for JPG generation -->
-<PrintOrderSummary
-  {order}
-  {patient}
-  {liner}
-  {foot}
-/>
 
+<!-- Always rendered -->
+
+<div
+  id="print-clean"
+  class="hidden print-clean bg-white text-black px-10 py-8 text-sm leading-tight"
+>
+
+  <PrintOrderSummary
+    {order}
+    {patient}
+    {liner}
+    {foot}
+    uploadedFileName={uploadedFileName}
+  />
+</div>

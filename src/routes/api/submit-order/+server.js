@@ -1,19 +1,44 @@
 import fs from 'fs';
 import path from 'path';
-import { fileURLToPath } from 'url';
 
-// Setup __dirname for ES Modules
-const __filename = fileURLToPath(import.meta.url);
-const __dirname = path.dirname(__filename);
+// ✅ Define your target paths relative to project root
+const baseDir = path.resolve('static/orders');
+const usersFile = path.resolve('static/data/users.json');
 
-// Path to save orders
-const baseDir = path.resolve(__dirname, '../../../../static/orders');
+// 🔧 Helper: Get next workorder number
+function getNextWorkorderNumber(baseDir) {
+  const now = new Date();
+  const year = String(now.getFullYear()).slice(-2);
+  const week = String(getWeekNumber(now)).padStart(2, '0');
 
+  const yearDir = path.join(baseDir, year);
+  const weekDir = path.join(yearDir, week);
+
+  if (!fs.existsSync(weekDir)) {
+    fs.mkdirSync(weekDir, { recursive: true });
+  }
+
+  const existing = fs.readdirSync(weekDir).filter(name => /^\d{2}$/.test(name));
+  const nextIndex = (existing.length + 1).toString().padStart(2, '0');
+
+  return `${year}${week}00${nextIndex}`;
+}
+
+function getWeekNumber(date) {
+  const d = new Date(Date.UTC(date.getFullYear(), date.getMonth(), date.getDate()));
+  const dayNum = d.getUTCDay() || 7;
+  d.setUTCDate(d.getUTCDate() + 4 - dayNum);
+  const yearStart = new Date(Date.UTC(d.getUTCFullYear(), 0, 1));
+  return Math.ceil((((d - yearStart) / 86400000) + 1) / 7);
+}
+
+// 📥 POST handler
 export async function POST({ request }) {
   const formData = await request.formData();
 
-  const file = formData.get('file');             // 📎 Uploaded file (optional)
-  const printFile = formData.get('printFile');   // 🖼️ Generated JPG of order form
+  const file = formData.get('file');
+  const printFile = formData.get('printFile');            // JPG
+  const printSummary = formData.get('printSummary');      // PDF ✅
 
   const order = JSON.parse(formData.get('order'));
   const patient = JSON.parse(formData.get('patient'));
@@ -21,15 +46,28 @@ export async function POST({ request }) {
   const foot = JSON.parse(formData.get('foot'));
 
   try {
-    // 🔢 Generate workorder number
+    // Load user list and match facility
+    const users = JSON.parse(fs.readFileSync(usersFile, 'utf-8'));
+    const customerUser = users.find(u => u.role === 'customer' && u.facilities);
+    const selectedFacility = customerUser?.facilities.find(f => f.name === patient.facility);
+
+    const submittingUserEmail = customerUser?.email || 'unknown@noemail.com';
+    order.submittedBy = submittingUserEmail;
+
+    if (selectedFacility) {
+      patient.facilityDetails = selectedFacility;
+    }
+
     const workorder = getNextWorkorderNumber(baseDir);
     order.workorder = workorder;
+
+    const now = new Date();
+    order.receivedDate = `${String(now.getMonth() + 1).padStart(2, '0')}/${String(now.getDate()).padStart(2, '0')}/${now.getFullYear()}`;
 
     if (!/^\d{8}$/.test(workorder)) {
       throw new Error(`Invalid workorder format: ${workorder}`);
     }
 
-    // 🗂️ Build folder structure: /YY/WW/NN
     const year = workorder.slice(0, 2);
     const week = workorder.slice(2, 4);
     const rawOrderNum = workorder.slice(4);
@@ -38,27 +76,30 @@ export async function POST({ request }) {
 
     fs.mkdirSync(folderPath, { recursive: true });
 
-    // ✅ Save order.json
+    // Save order.json
     fs.writeFileSync(
       path.join(folderPath, 'order.json'),
       JSON.stringify({ order, patient, liner, foot }, null, 2)
     );
 
-    // ✅ Save uploaded file (e.g., scan or reference image)
+    // Save uploaded file
     if (file && file.name) {
       const buffer = Buffer.from(await file.arrayBuffer());
-      const filePath = path.join(folderPath, file.name);
-      fs.writeFileSync(filePath, buffer);
+      fs.writeFileSync(path.join(folderPath, file.name), buffer);
     }
 
-    // ✅ Save generated JPG of order form
-if (printFile && typeof printFile.arrayBuffer === 'function') {
-  const printBuffer = Buffer.from(await printFile.arrayBuffer());
-  const printPath = path.join(folderPath, 'printable.jpg'); // <-- updated to .jpg
-  fs.writeFileSync(printPath, printBuffer);
-}
+    // Save printable.jpg
+    if (printFile && typeof printFile.arrayBuffer === 'function') {
+      const printBuffer = Buffer.from(await printFile.arrayBuffer());
+      fs.writeFileSync(path.join(folderPath, 'printable.jpg'), printBuffer);
+    }
 
-    // ✅ Respond with success and workorder number
+    // ✅ Save print-summary.pdf
+    if (printSummary && typeof printSummary.arrayBuffer === 'function') {
+      const summaryBuffer = Buffer.from(await printSummary.arrayBuffer());
+      fs.writeFileSync(path.join(folderPath, 'print-summary.pdf'), summaryBuffer);
+    }
+
     return new Response(JSON.stringify({ success: true, workorder }), {
       status: 200,
       headers: { 'Content-Type': 'application/json' }
@@ -71,33 +112,4 @@ if (printFile && typeof printFile.arrayBuffer === 'function') {
       headers: { 'Content-Type': 'application/json' }
     });
   }
-}
-
-// 🔢 Generate workorder: YYWW00NN format
-function getNextWorkorderNumber(baseDir) {
-  const now = new Date();
-  const year = now.getFullYear().toString().slice(-2);
-  const start = new Date(now.getFullYear(), 0, 1);
-  const days = Math.floor((now - start) / (24 * 60 * 60 * 1000));
-  const week = Math.ceil((days + start.getDay() + 1) / 7);
-  const yy = year;
-  const ww = String(week).padStart(2, '0');
-  const weekPath = path.join(baseDir, yy, ww);
-
-  let nextOrderNum = 1;
-
-  if (fs.existsSync(weekPath)) {
-    const existing = fs.readdirSync(weekPath, { withFileTypes: true });
-    const nums = existing
-      .filter(dirent => dirent.isDirectory() && /^\d{2}$/.test(dirent.name))
-      .map(dirent => parseInt(dirent.name, 10))
-      .sort((a, b) => b - a);
-
-    if (nums.length > 0) {
-      nextOrderNum = nums[0] + 1;
-    }
-  }
-
-  const padded = String(nextOrderNum).padStart(2, '0');
-  return `${yy}${ww}00${padded}`; // e.g., "25320001"
 }

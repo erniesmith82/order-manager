@@ -24,7 +24,7 @@
     }
   },
   {
-    "id": "user-1754016209099",
+    "id": "user-007",
     "name": "Customer John",
     "email": "customer@example.com",
     "password": "customer123",
@@ -36,10 +36,10 @@
     },
     "facilities": [
       {
-        "name": "",
+        "name": "BGRN Industries",
         "address": "4505 NW 165 ST",
-        "city": "MIAMI GARDENS",
-        "state": "FL",
+        "city": "OPA LOCKA ",
+        "state": "FL ",
         "zip": "33054"
       }
     ]
