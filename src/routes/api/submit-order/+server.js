@@ -83,10 +83,12 @@ export async function POST({ request }) {
     }
 
     // 💾 Save print summary (PDF)
-    if (printSummary && typeof printSummary.arrayBuffer === 'function') {
-      const pdfBuffer = Buffer.from(await printSummary.arrayBuffer());
-      fs.writeFileSync(path.join(folderPath, 'order-summary.pdf'), pdfBuffer);
-    }
+ // 💾 Save print summary (JPG)
+if (printSummary && typeof printSummary.arrayBuffer === 'function') {
+  const jpgBuffer = Buffer.from(await printSummary.arrayBuffer());
+  fs.writeFileSync(path.join(folderPath, 'order-summary.jpg'), jpgBuffer);
+}
+
 
     return new Response(JSON.stringify({ success: true, workorder }), {
       status: 200,

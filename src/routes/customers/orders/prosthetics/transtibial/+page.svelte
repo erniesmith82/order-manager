@@ -52,74 +52,78 @@
     );
   }
 
-  async function handleSubmit() {
-    checkFormValidity();
+ async function handleSubmit() {
+  checkFormValidity();
 
-    if (!canSubmit || !uploadedFile) {
-      alert("Please fill out all required fields and upload a file.");
-      return;
-    }
-
-    try {
-      if (typeof window !== 'undefined') {
-        const domtoimage = await import('dom-to-image-more');
-        const html2pdf = (await import('html2pdf.js')).default;
-
-        // 🔍 JPG capture of clean form
-        const cleanElement = document.getElementById('print-area');
-        cleanElement.classList.remove('hidden');
-
-        const jpgBlob = await domtoimage.toBlob(cleanElement, {
-          quality: 0.95,
-          bgcolor: '#ffffff',
-          filter: (node) => true
-        });
-
-        cleanElement.classList.add('hidden');
-
-        // 🔍 PDF capture of summary
-        const summaryElement = document.getElementById('print-summary');
-        const pdfBlob = await html2pdf().from(summaryElement).set({
-          margin: 0.5,
-          filename: 'Transtibial_Socket_Summary.pdf',
-          image: { type: 'jpeg', quality: 0.98 },
-          html2canvas: { scale: 2 },
-          jsPDF: { unit: 'in', format: 'letter', orientation: 'portrait' }
-        }).outputPdf('blob');
-
-        // ✅ File & order metadata
-        uploadedFileName = uploadedFile.name;
-        order.uploadedFileName = uploadedFileName;
-        order.product = 'Transtibial Socket';
-
-        const formData = new FormData();
-        formData.append('file', uploadedFile);
-        formData.append('printFile', jpgBlob, 'printable.jpg');
-        formData.append('printSummary', pdfBlob, 'print-summary.pdf');
-        formData.append('order', JSON.stringify(order));
-        formData.append('patient', JSON.stringify(patient));
-        formData.append('liner', JSON.stringify(liner));
-        formData.append('foot', JSON.stringify(foot));
-
-        const res = await fetch('/api/submit-order', {
-          method: 'POST',
-          body: formData
-        });
-
-        const result = await res.json();
-
-        if (res.ok && result.success) {
-          alert(`✅ Order ${result.workorder} submitted successfully!`);
-          window.location.href = '/customers/orders';
-        } else {
-          alert("❌ Submission failed.");
-        }
-      }
-    } catch (error) {
-      console.error("❌ Submission error:", error);
-      alert("An error occurred during submission.");
-    }
+  if (!canSubmit || !uploadedFile) {
+    alert("Please fill out all required fields and upload a file.");
+    return;
   }
+
+  try {
+    if (typeof window !== 'undefined') {
+      const { toBlob } = await import('dom-to-image-more'); // ✅ Proper destructure
+
+      // 📸 Capture workorder diagram (print-area)
+      const workorderElement = document.getElementById('print-area');
+      workorderElement.classList.remove('hidden');
+
+      const jpgBlob = await toBlob(workorderElement, {
+        quality: 0.95,
+        bgcolor: '#ffffff',
+        width: workorderElement.scrollWidth,
+        height: workorderElement.scrollHeight
+      });
+
+      workorderElement.classList.add('hidden');
+
+      // 📸 Capture order summary as image (print-summary)
+      const summaryElement = document.getElementById('print-summary');
+      summaryElement.classList.remove('hidden');
+
+      const summaryJpgBlob = await toBlob(summaryElement, {
+        quality: 0.95,
+        bgcolor: '#ffffff',
+        width: summaryElement.scrollWidth,
+        height: summaryElement.scrollHeight
+      });
+
+      summaryElement.classList.add('hidden');
+
+      // ✅ File & order metadata
+      uploadedFileName = uploadedFile.name;
+      order.uploadedFileName = uploadedFileName;
+      order.product = 'Transtibial Socket';
+
+      const formData = new FormData();
+      formData.append('file', uploadedFile);
+      formData.append('printFile', jpgBlob, 'workorder.jpg');
+      formData.append('printSummary', summaryJpgBlob, 'order-summary.jpg');
+      formData.append('order', JSON.stringify(order));
+      formData.append('patient', JSON.stringify(patient));
+      formData.append('liner', JSON.stringify(liner));
+      formData.append('foot', JSON.stringify(foot));
+
+      const res = await fetch('/api/submit-order', {
+        method: 'POST',
+        body: formData
+      });
+
+      const result = await res.json();
+
+      if (res.ok && result.success) {
+        alert(`✅ Order ${result.workorder} submitted successfully!`);
+        window.location.href = '/customers/orders';
+      } else {
+        alert("❌ Submission failed.");
+      }
+    }
+  } catch (error) {
+    console.error("❌ Submission error:", error);
+    alert("An error occurred during submission.");
+  }
+}
+
 </script>
 
 
