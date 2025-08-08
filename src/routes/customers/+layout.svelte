@@ -25,66 +25,44 @@
     sidebarOpen = !sidebarOpen;
   }
 </script>
+
 <style global>
-@media print {
+ @media print {
   .no-print,
-  aside,
-  nav,
-  .sidebar,
-  .layout-nav,
   #admin-sidebar {
     display: none !important;
     visibility: hidden !important;
   }
 
-    body {
-      margin: 0;
-      padding: 0;
-    }
+  body * {
+    visibility: hidden !important;
+  }
 
-    body * {
-      visibility: hidden;
-    }
+  #print-clean,
+  #print-clean * {
+    visibility: visible !important;
+  }
 
-    .no-print,
-    aside,
-    nav,
-    .sidebar,
-    .layout-nav {
-      display: none !important;
-      visibility: hidden !important;
-    }
+  #print-clean {
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 8.5in;
+    height: 11in;
+    padding: 0.5in;
+    background: white;
+    box-sizing: border-box;
+  }
+}
 
-    #print-area,
-    #print-area * {
-      visibility: visible;
-    }
-
-    #print-area {
-      width: 8.5in;
-      padding: 0.5in;
-      box-sizing: border-box;
-      background: white;
-    }
-
-    main {
-      width: 100% !important;
-      margin: 0 auto !important;
-    }
-
-    input, textarea, select {
-      border: none !important;
-      border-bottom: 1px solid black !important;
-      background: transparent !important;
-      font-weight: bold !important;
-    }
 
     img {
       max-width: 100%;
       height: auto;
     }
-  }
+  
 </style>
+
 
 
 

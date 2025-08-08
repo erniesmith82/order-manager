@@ -4,20 +4,15 @@
 
   export let data;
 
-  // User info
   let user = data?.user ?? { facilities: [] };
   let workorder = data.workorder;
-
-  // File state
   let uploadedFile = null;
   let uploadedFileName = '';
 
-  // Date setup
   const now = new Date();
   const todayFormatted = `${String(now.getMonth() + 1).padStart(2, '0')}/${String(now.getDate()).padStart(2, '0')}/${now.getFullYear()}`;
   const today = now.toISOString().split('T')[0];
 
-  // Order object
   let order = {
     workorder: data.workorder,
     receivedDate: todayFormatted,
@@ -28,26 +23,22 @@
     comment: ''
   };
 
-  // Patient details
   let patient = {
     name: '', facility: '', account: '',
     height: '', weight: '', age: '', practitioner: '',
     sex: '', activity: '', side: [], email: '', phone: ''
   };
 
-  // Misc
   let liner = { type: '', size: '', thickness: '' };
   let foot = { type: '', size: '' };
   let canSubmit = false;
 
-  // Validation tracking
   let errors = {
     name: false, practitioner: false, email: false, phone: false,
     activity: false, side: false, shipping: false,
     neededDate: false, receivedDate: false, file: false
   };
 
-  // ✅ Step 1: Validate required fields
   function checkFormValidity() {
     const required = [
       patient.name, patient.practitioner, patient.email,
@@ -61,7 +52,6 @@
     );
   }
 
-  // 📤 Step 2: Submit form with JPG + PDF capture
   async function handleSubmit() {
     checkFormValidity();
 
@@ -72,26 +62,22 @@
 
     try {
       if (typeof window !== 'undefined') {
-        const { default: html2canvas } = await import('html2canvas');
+        const domtoimage = await import('dom-to-image-more');
         const html2pdf = (await import('html2pdf.js')).default;
 
-        // 🔍 Select clean order summary element (JPG)
-        const cleanElement = document.getElementById('print-clean');
+        // 🔍 JPG capture of clean form
+        const cleanElement = document.getElementById('print-area');
         cleanElement.classList.remove('hidden');
 
-        const canvas = await html2canvas(cleanElement, {
-          scale: 3,
-          useCORS: true,
-          backgroundColor: '#fff'
+        const jpgBlob = await domtoimage.toBlob(cleanElement, {
+          quality: 0.95,
+          bgcolor: '#ffffff',
+          filter: (node) => true
         });
-
-        const jpgBlob = await new Promise(resolve =>
-          canvas.toBlob(resolve, 'image/jpeg', 0.95)
-        );
 
         cleanElement.classList.add('hidden');
 
-        // 🔍 Select printable summary element (PDF)
+        // 🔍 PDF capture of summary
         const summaryElement = document.getElementById('print-summary');
         const pdfBlob = await html2pdf().from(summaryElement).set({
           margin: 0.5,
@@ -101,12 +87,11 @@
           jsPDF: { unit: 'in', format: 'letter', orientation: 'portrait' }
         }).outputPdf('blob');
 
-        // ✅ Store filename and product info
+        // ✅ File & order metadata
         uploadedFileName = uploadedFile.name;
         order.uploadedFileName = uploadedFileName;
         order.product = 'Transtibial Socket';
 
-        // 📨 Build submission payload
         const formData = new FormData();
         formData.append('file', uploadedFile);
         formData.append('printFile', jpgBlob, 'printable.jpg');
@@ -137,23 +122,49 @@
   }
 </script>
 
+
 <style global>
   @media print {
     @page {
       size: 8.5in 11in;
-      margin: 0;
+      margin: 10px;
     }
-  #print-clean {
-  position: absolute;
-  top: 0;
-  left: 0;
+    body * {
+      visibility: hidden;
+    }
+@media print {
+  .no-print,
+  #admin-sidebar {
+    display: none !important;
+    visibility: hidden !important;
+  }
+
+  body * {
+    visibility: hidden !important;
+  }
+
+  #print-clean,
+  #print-clean * {
+    visibility: visible !important;
+  }
+
+#print-area {
   width: 8.5in;
-  height: 11in;
-  padding: 0.4in;
+  height: 10in;
+  transform: scale(0.9);           /* Shrink to 90% size */
+  transform-origin: top left;
+  padding: 0.2in 0.5in 0.2in 0.2in; /* Smaller left padding */
+  background: white;
   box-sizing: border-box;
-  transform: scale(1);
-  overflow: hidden;
+  margin-left: -275px;
+  margin-top: -270px;
+  margin-right: 200px;
 }
+
+
+}
+
+
 
     input,
     textarea,
@@ -174,8 +185,6 @@
       background: none;
     }
 
-
-
     input[type="checkbox"]:checked::before {
       content: "✔";
       position: absolute;
@@ -188,41 +197,19 @@
       height: 250px !important;
       max-width: 100% !important;
     }
-
-    img[alt="Socket Diagram"] {
-      height: 600px !important;
-      width: auto;
-      margin-top: -125px !important;
-    }
-
-
-
-    #notes {
-      margin-top: -1rem !important;
-    }
-
-    #measurementB { left: 51.5%; top: 51%; }
-    #measurementA { left: 85.5%; top: 49%; }
-    #measurementD { left: 59%; top: 59.5%; }
-
-    body * {
-  visibility: hidden;
+#legend{
+  margin-top: -150px;
 }
-
-.no-print,
-aside,
-nav,
-.sidebar,
-.layout-nav {
-  display: none !important;
-  visibility: hidden !important;
+#notes{
+  margin-top: -50px;
 }
-
+    
   }
 </style>
 
+
 <!-- File Upload Input -->
-<div id="fullPage" class="h-490 bg-gradient-to-b from-[rgba(0,0,0,0.6)] via-[rgba(55,65,81,0.5)] to-[rgba(0,0,0,0.6)] p-8">
+<div id="fullPage" class="h-550 bg-gradient-to-b from-[rgba(0,0,0,0.6)] via-[rgba(55,65,81,0.5)] to-[rgba(0,0,0,0.6)] p-8">
   <div class="mt-4 no-print flex justify-center border-2 border-[#f58220] w-[65%] bg-white p-4 mx-auto rounded">
     <div class="flex flex-col items-center w-full max-w-sm">
       <label
@@ -251,11 +238,11 @@ nav,
 
 <!-- start of form -->
 <div  id="print-area" >
-<div id="form-wrapper" class="scale-[1.2] origin-top w-[1100px] p-15 mx-auto mt-3 print:mt-[-90px] bg-white">
+<div id="form-wrapper" class="scale-[1.2] origin-top w-[1100px] p-15 mx-auto mt-3 bg-white">
 
 <div class="bg-white text-black text-[12px] leading-tight">
 
-  <div  class="print:scale-[0.85] print:origin-top-left px-4 print:px-2 pt-2 border-b-2 border-black flex justify-between items-center">
+  <div  class="pt-2 border-b-2 border-black flex justify-between items-center">
   <img
   id="logo"
     src="/BiosculptorFabrications.png"
@@ -425,109 +412,86 @@ nav,
 
 
   <!-- Materials + Diagram -->
-  <div class="flex w-full mt-4 gap-2">
-    <div class="w-1/2 pr-2 text-sm space-y-2">
-      <div>
-        <h3 class="text-xl font-bold text-[#f58220]">Materials & Components</h3>
-        <div class="flex flex-col gap-1 pt-1">
-          {#each ['PP', 'PE', 'FLEXFORM', 'Pelite Cone', 'Acrylic / Duraflex / Dioclear'] as item}
-            <label class="flex items-center gap-2"><input type="checkbox" class="w-4 h-4" /> {item}</label>
-          {/each}
+  <!-- Wrapping container -->
+<div id="materials" class="flex flex-row w-full mt-4 gap-4">
+
+  <!-- Left: Materials & Components -->
+  <div class="w-1/2 pr-2 text-sm space-y-4">
+    <h3 class="text-xl font-bold text-[#f58220]">Materials & Components</h3>
+    <div class="flex flex-col gap-1">
+      {#each ['PP', 'PE', 'FLEXFORM', 'Pelite Cone', 'Acrylic / Duraflex / Dioclear'] as item}
+        <label class="flex items-center gap-2">
+          <input type="checkbox" class="w-4 h-4" /> {item}
+        </label>
+      {/each}
+    </div>
+
+    <div>
+      <h4 class="text-lg font-semibold text-[#f58220]">Liner Type</h4>
+      <div class="pl-2 space-y-1">
+        <div class="flex items-center gap-1">
+          <label class="w-20">Type:</label>
+          <input bind:value={liner.type} class="border-b border-black w-1/2 bg-transparent outline-none text-sm py-0.5" />
+        </div>
+        <div class="flex items-center gap-1">
+          <label class="w-20">Size:</label>
+          <input bind:value={liner.size} class="border-b border-black w-1/2 bg-transparent outline-none text-sm py-0.5" />
+        </div>
+        <div class="flex items-center gap-1">
+          <label class="w-20">Thickness:</label>
+          <input bind:value={liner.thickness} class="border-b border-black w-1/2 bg-transparent outline-none text-sm py-0.5" />
         </div>
       </div>
+    </div>
 
-      <div class="text-sm">
-  <h4 class="text-lg font-semibold text-[#f58220]">Liner Type</h4>
-  <div class="pl-2 space-y-1">
-    <div class="flex items-center gap-1">
-      <label class="w-20">Type:</label>
-      <input
-        bind:value={liner.type}
-        placeholder="Type"
-        class="border-b border-black w-[50%] bg-transparent outline-none text-sm py-0.5"
-      />
+    <div>
+      <h4 class="text-lg font-semibold text-[#f58220]">Suspension</h4>
+      {#each ['Section', 'Pin Lock Type', 'Silicone Valve Sleeve'] as s}
+        <label class="flex items-center gap-2"><input type="checkbox" class="w-4 h-4" /> {s}</label>
+      {/each}
     </div>
-    <div class="flex items-center gap-1">
-      <label class="w-20">Size:</label>
-      <input
-        bind:value={liner.size}
-        placeholder="Size"
-        class="border-b border-black w-[50%] bg-transparent outline-none text-sm py-0.5"
-      />
+
+    <div>
+      <h4 class="text-lg font-semibold text-[#f58220]">Distal End</h4>
+      {#each ['Fitted', 'Injection Void', 'Injection Kit'] as s}
+        <label class="flex items-center gap-2"><input type="checkbox" class="w-4 h-4" /> {s}</label>
+      {/each}
     </div>
-    <div class="flex items-center gap-1">
-      <label class="w-20">Thickness:</label>
-      <input
-        bind:value={liner.thickness}
-        placeholder="Thickness"
-        class="border-b border-black w-[50%] bg-transparent outline-none text-sm py-0.5"
-      />
+
+    <div>
+      <h4 class="text-lg font-semibold text-[#f58220]">Foot</h4>
+      <div class="pl-2 space-y-1">
+        <div class="flex items-center gap-1">
+          <label class="w-12">Type:</label>
+          <input bind:value={foot.type} class="border-b border-black w-1/2 bg-transparent outline-none text-sm py-0.5" />
+        </div>
+        <div class="flex items-center gap-1">
+          <label class="w-12">Size:</label>
+          <input bind:value={foot.size} class="border-b border-black w-1/2 bg-transparent outline-none text-sm py-0.5" />
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Right: Diagram -->
+  <div id="diagram" class="w-1/2 relative flex flex-col items-center justify-start">
+    <div class="relative w-full flex justify-center">
+      <img src="/transtibialDiagram.png" alt="Socket Diagram" class="h-[650px] object-contain z-0" />
+      <input id="measurementB" type="text" class="absolute top-[37%] left-[7%] w-16 h-8 border font-bold text-center text-sm" placeholder="" />
+      <input id="measurementD" type="text" class="absolute top-[33.5%] left-[75.5%] w-16 h-8 border font-bold text-center text-sm" placeholder="" />
+      <input id="measurementA" type="text" class="absolute top-[55%] left-[24%] w-16 h-8 border font-bold text-center text-sm" placeholder="" />
+    </div>
+
+    <div id="legend" class="text-center text-xs pt-2">
+      a. SC ML<br />
+      b. Femoral Condyle ML<br />
+      c. Depth of Medial Flare<br />
+      d. MPT to Distal<br />
+      <strong>IF LINER IS TO BE USED, MEASUREMENTS ARE TAKEN OVER LINER.</strong>
     </div>
   </div>
 </div>
 
- 
-      <div>
-        <h4 class="text-lg font-semibold text-[#f58220]">Suspension</h4>
-        {#each ['Section', 'Pin Lock Type', 'Silicone Valve Sleeve'] as s}
-          <label class="flex items-center gap-2"><input type="checkbox" class="w-4 h-4" /> {s}</label>
-        {/each}
-      </div>
-
-      <div>
-        <h4 class="text-lg font-semibold text-[#f58220]">Distal End</h4>
-        {#each ['Fitted', 'Injection Void', 'Injection Kit'] as s}
-          <label class="flex items-center gap-2"><input type="checkbox" class="w-4 h-4" /> {s}</label>
-        {/each}
-      </div>
-
-      <div class="text-sm">
-  <h4 class="text-lg font-semibold text-[#f58220]">Foot</h4>
-  <div class="pl-2 space-y-1">
-    <div class="flex items-center gap-1">
-      <label class="w-12">Type:</label>
-      <input
-        bind:value={foot.type}
-        placeholder="Type"
-        class="border-b border-black w-[50%] bg-transparent outline-none text-sm py-0.5"
-      />
-    </div>
-    <div class="flex items-center gap-1">
-      <label class="w-12">Size:</label>
-      <input
-        bind:value={foot.size}
-        placeholder="Size"
-        class="border-b border-black w-[50%] bg-transparent outline-none text-sm py-0.5"
-      />
-      
-    </div>
-  </div>
-</div>
-    </div>
-
-    <div class="w-1/2 flex flex-col items-center">
-      <img src="/transtibialDiagram.png" alt="Socket Diagram" class="h-[650px] object-contain -mt-0 relative z-0" />
-      <input id="measurementB"
-    type="text"
-    class="absolute top-[54%] left-[55%] w-16 h-8 border font-bold text-center text-sm"
-    placeholder=""
-  />
-     <input id="measurementD"
-    type="text"
-    class="absolute top-[52.5%] left-[85.5%] w-16 h-8 border font-bold text-center text-sm"
-    placeholder=""
-  />
-   <input id="measurementA"
-    type="text"
-    class="absolute top-[62.5%] left-[62%] w-16 h-8 border font-bold text-center text-sm"
-    placeholder=""
-  />
-      <div id="legend" class="text-center text-xs pt-1 -mt-30">
-        a. SC ML<br />b. Femoral Condyle ML<br />c. Depth of Medial Flare<br />d. MPT to Distal
-        <br> <strong>IF LINER IS UTO BE USED, MEASUREMENTS ARE TAKEN OVER LINER. </strong>
-      </div>
-    </div>
-  </div>
 
   <!-- Notes Section -->
   <div class="mt-4" id="notes">
@@ -566,12 +530,9 @@ nav,
 </div>
 </div>
 </div>
-<!-- ✅ Hidden clean layout for JPG generation -->
-
-<!-- Always rendered -->
 
 <div
-  id="print-clean"
+  id="print-summary"
   class="hidden print-clean bg-white text-black px-10 py-8 text-sm leading-tight"
 >
 

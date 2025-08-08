@@ -26,6 +26,7 @@
 		"vite": "^7.0.4"
 	},
 	"dependencies": {
+		"dom-to-image-more": "^3.6.0",
 		"formidable": "^3.5.4",
 		"html2canvas": "^1.4.1",
 		"html2pdf.js": "^0.10.3"
