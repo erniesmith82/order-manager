@@ -1,0 +1,52 @@
+{
+  "workorder": "25330001",
+  "YY": "25",
+  "WW": "33",
+  "NN": "01",
+  "createdAt": "2025-08-10T00:00:00.000Z",
+  "patient": {
+    "name": "r",
+    "facilityDetails": {
+      "name": "BGRN Industries",
+      "address": "4505 NW 165 ST",
+      "city": "OPA LOCKA ",
+      "state": "FL ",
+      "zip": "33054"
+    },
+    "account": "r",
+    "height": "r",
+    "weight": "r",
+    "age": "r",
+    "practitioner": "r",
+    "sex": "r",
+    "activity": "r",
+    "side": [
+      "right"
+    ],
+    "email": " l",
+    "phone": "r"
+  },
+  "order": {
+    "workorder": "25330001",
+    "receivedDate": "08/10/2025",
+    "shipping": "FedEx Express Saver",
+    "neededDate": "2025-08-19",
+    "uploadedFileName": "Transtibial(1)_Form.jpg",
+    "product": "Transtibial Socket",
+    "comment": ""
+  },
+  "liner": {
+    "type": "",
+    "size": "",
+    "thickness": ""
+  },
+  "foot": {
+    "type": "",
+    "size": ""
+  },
+  "files": {
+    "uploadedFile": "Transtibial(1)_Form.jpg",
+    "jpg": "workorder.jpg",
+    "summaryJpg": "order-summary.jpg"
+  }
+}

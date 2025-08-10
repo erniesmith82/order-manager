@@ -1,105 +1,184 @@
-import fs from 'fs';
+// /src/routes/api/submit-order/+server.js
+import fsp from 'fs/promises';
 import path from 'path';
+import { fileURLToPath } from 'url';
 
-// 📂 Static paths
-const baseDir = path.resolve('static/orders');
-const usersFile = path.resolve('static/data/users.json');
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
+const projectRoot = path.resolve(__dirname, '../../../../');
+const ORDERS_ROOT = path.join(projectRoot, 'static', 'orders');
 
-// 📅 Generate next workorder number: YYWW00NN
-function getNextWorkorderNumber(baseDir) {
-  const now = new Date();
-  const year = String(now.getFullYear()).slice(-2);
-  const week = String(getWeekNumber(now)).padStart(2, '0');
+/* -------------------- Helpers -------------------- */
 
-  const weekDir = path.join(baseDir, year, week);
-  if (!fs.existsSync(weekDir)) fs.mkdirSync(weekDir, { recursive: true });
-
-  const existing = fs.readdirSync(weekDir).filter(name => /^\d{2}$/.test(name));
-  const nextIndex = (existing.length + 1).toString().padStart(2, '0');
-
-  return `${year}${week}00${nextIndex}`;
+// Parse JSON fields safely
+function safeParseJson(value, label) {
+  if (!value) return null;
+  try { return JSON.parse(value); }
+  catch (e) { throw new Error(`Invalid JSON for "${label}": ${e.message}`); }
 }
 
-function getWeekNumber(date) {
-  const d = new Date(Date.UTC(date.getFullYear(), date.getMonth(), date.getDate()));
-  const dayNum = d.getUTCDay() || 7;
-  d.setUTCDate(d.getUTCDate() + 4 - dayNum);
-  const yearStart = new Date(Date.UTC(d.getUTCFullYear(), 0, 1));
-  return Math.ceil((((d - yearStart) / 86400000) + 1) / 7);
+/** ET date parts (no Date objects -> no TZ drift) */
+function getETParts() {
+  const parts = new Intl.DateTimeFormat('en-US', {
+    timeZone: 'America/New_York',
+    year: 'numeric', month: '2-digit', day: '2-digit',
+    hour: '2-digit', minute: '2-digit', second: '2-digit',
+    hour12: false
+  }).formatToParts(new Date());
+  const get = (t) => parseInt(parts.find(p => p.type === t)?.value, 10);
+  return { y: get('year'), m: get('month'), d: get('day') };
 }
 
-// 📥 Handle form submission
+/** Day of week for y/m/d, Sunday=0..Saturday=6 (Sakamoto) */
+function dowSun0(y, m, d) {
+  const t = [0, 3, 2, 5, 0, 3, 5, 1, 4, 6, 2, 4];
+  if (m < 3) y -= 1;
+  return (y + Math.floor(y/4) - Math.floor(y/100) + Math.floor(y/400) + t[m-1] + d) % 7;
+}
+
+/** Day of year 1..366 */
+function isLeap(y){ return (y%4===0 && y%100!==0) || (y%400===0); }
+function dayOfYear(y, m, d) {
+  const mdays = [31, (isLeap(y) ? 29 : 28), 31,30,31,30,31,31,30,31,30,31];
+  let n = d; for (let i = 0; i < m-1; i++) n += mdays[i];
+  return n;
+}
+
+/** Sunday-start week number 1..53 using ET y/m/d */
+function etSundayWeekNumber(y, m, d) {
+  const doy = dayOfYear(y, m, d);
+  const firstDow = dowSun0(y, 1, 1); // 0=Sun
+  return Math.floor((doy + firstDow - 1) / 7) + 1;
+}
+
+/**
+ * Determine next workorder number & ensure directory exists (race-safe).
+ * Format: YYWW00NN
+ * Folders: /static/orders/YY/WW/NN
+ */
+async function getNextWorkorderNumber() {
+  const { y, m, d } = getETParts();
+  const YY = String(y).slice(-2);
+  const WW = String(etSundayWeekNumber(y, m, d)).padStart(2, '0');
+
+  const weekDir = path.join(ORDERS_ROOT, YY, WW);
+  await fsp.mkdir(weekDir, { recursive: true });
+
+  // Atomically create first free NN folder 01..99
+  let NN = null;
+  let orderDir = null;
+
+  for (let i = 1; i <= 99; i++) {
+    const candidate = String(i).padStart(2, '0');
+    const candidateDir = path.join(weekDir, candidate);
+    try {
+      await fsp.mkdir(candidateDir, { recursive: false }); // throws EEXIST if taken
+      NN = candidate;
+      orderDir = candidateDir;
+      break;
+    } catch (err) {
+      if (err?.code === 'EEXIST') continue;
+      throw err;
+    }
+  }
+  if (!NN) throw new Error(`No available NN slot in ${weekDir}`);
+
+  const workorder = `${YY}${WW}00${NN}`;
+  return { workorder, orderDir, YY, WW, NN };
+}
+
+async function saveFormFile(fd, field, destPathBase) {
+  const file = fd.get(field);
+  if (!file || typeof file === 'string') return null;
+  const buf = Buffer.from(await file.arrayBuffer());
+  let outName = (file.name || field).replace(/[\\/]+/g, '_');
+  const outPath = path.join(destPathBase, outName);
+  await fsp.writeFile(outPath, buf);
+  return outName;
+}
+
+/* -------------------- SvelteKit Handler -------------------- */
+
+const WO_RE = /^(\d{2})(\d{2})00(\d{2})$/; // YY WW 00 NN
+
 export async function POST({ request }) {
-  const formData = await request.formData();
-
-  const file = formData.get('file');
-  const printFile = formData.get('printFile');          // workorder.jpg
-  const printSummary = formData.get('printSummary');    // order-summary.pdf
-
-  const order = JSON.parse(formData.get('order'));
-  const patient = JSON.parse(formData.get('patient'));
-  const liner = JSON.parse(formData.get('liner'));
-  const foot = JSON.parse(formData.get('foot'));
-
   try {
-    // 🧑 Find submitting user
-    const users = JSON.parse(fs.readFileSync(usersFile, 'utf-8'));
-    const customerUser = users.find(u => u.role === 'customer' && u.facilities);
-    const selectedFacility = customerUser?.facilities.find(f => f.name === patient.facility);
+    const form = await request.formData();
 
-    order.submittedBy = customerUser?.email || 'unknown@noemail.com';
-    if (selectedFacility) {
-      patient.facilityDetails = selectedFacility;
+    const patient = safeParseJson(form.get('patient'), 'patient') ?? {};
+    const order   = safeParseJson(form.get('order'), 'order') ?? {};
+    const liner   = safeParseJson(form.get('liner'), 'liner') ?? {};
+    const foot    = safeParseJson(form.get('foot'), 'foot') ?? {};
+
+    // STEP ONE support: allow attaching to an existing workorder
+    const forceWorkorder = (form.get('forceWorkorder') || '').toString().trim();
+
+    let workorder, orderDir, YY, WW, NN;
+
+    if (forceWorkorder && WO_RE.test(forceWorkorder)) {
+      // Use the provided workorder dir, create if missing
+      const m = WO_RE.exec(forceWorkorder);
+      YY = m[1]; WW = m[2]; NN = m[3];
+      workorder = forceWorkorder;
+      orderDir = path.join(ORDERS_ROOT, YY, WW, NN);
+      await fsp.mkdir(orderDir, { recursive: true });
+    } else {
+      // Fresh assignment
+      ({ workorder, orderDir, YY, WW, NN } = await getNextWorkorderNumber());
     }
 
-    // 🆕 Generate workorder
-    const workorder = getNextWorkorderNumber(baseDir);
     order.workorder = workorder;
-    const now = new Date();
-    order.receivedDate = `${String(now.getMonth() + 1).padStart(2, '0')}/${String(now.getDate()).padStart(2, '0')}/${now.getFullYear()}`;
 
-    // 🗂 Create folder
-    if (!/^\d{8}$/.test(workorder)) throw new Error(`Invalid workorder format: ${workorder}`);
-    const year = workorder.slice(0, 2);
-    const week = workorder.slice(2, 4);
-    const index = parseInt(workorder.slice(6), 10).toString().padStart(2, '0');
-    const folderPath = path.join(baseDir, year, week, index);
-    fs.mkdirSync(folderPath, { recursive: true });
+    // Save files (merge with any existing)
+    const saved = {};
+    const uploadedName = await saveFormFile(form, 'uploadedFile', orderDir);
+    if (uploadedName) saved.uploadedFile = uploadedName;
 
-    // 💾 Save order.json
-    const orderPath = path.join(folderPath, 'order.json');
-    fs.writeFileSync(orderPath, JSON.stringify({ order, patient, liner, foot }, null, 2));
+    const pdfName = await saveFormFile(form, 'pdf', orderDir);
+    if (pdfName) saved.pdf = pdfName;
 
-    // 💾 Save uploaded file
-    if (file && typeof file.arrayBuffer === 'function') {
-      const fileBuffer = Buffer.from(await file.arrayBuffer());
-      fs.writeFileSync(path.join(folderPath, file.name), fileBuffer);
-    }
+    const jpgName = (await saveFormFile(form, 'jpg', orderDir))
+                 || (await saveFormFile(form, 'image', orderDir));
+    if (jpgName) saved.jpg = jpgName;
 
-    // 💾 Save workorder image (JPG)
-    if (printFile && typeof printFile.arrayBuffer === 'function') {
-      const jpgBuffer = Buffer.from(await printFile.arrayBuffer());
-      fs.writeFileSync(path.join(folderPath, 'workorder.jpg'), jpgBuffer);
-    }
+    const summaryName = await saveFormFile(form, 'summaryJpg', orderDir);
+    if (summaryName) saved.summaryJpg = summaryName;
 
-    // 💾 Save print summary (PDF)
- // 💾 Save print summary (JPG)
-if (printSummary && typeof printSummary.arrayBuffer === 'function') {
-  const jpgBuffer = Buffer.from(await printSummary.arrayBuffer());
-  fs.writeFileSync(path.join(folderPath, 'order-summary.jpg'), jpgBuffer);
-}
+    // Upsert order.json (merge)
+    const jsonPath = path.join(orderDir, 'order.json');
+    let existing = {};
+    try {
+      existing = JSON.parse(await fsp.readFile(jsonPath, 'utf8'));
+    } catch {}
 
+    const { y, m, d } = getETParts();
+    const createdAtIso = existing.createdAt ?? new Date(Date.UTC(y, m - 1, d, 0, 0, 0)).toISOString();
 
-    return new Response(JSON.stringify({ success: true, workorder }), {
-      status: 200,
-      headers: { 'Content-Type': 'application/json' }
-    });
+    const record = {
+      ...existing,
+      workorder,
+      YY, WW, NN,
+      createdAt: createdAtIso,
+      patient: { ...(existing.patient || {}), ...patient },
+      order:   { ...(existing.order   || {}), ...order   },
+      liner:   { ...(existing.liner   || {}), ...liner   },
+      foot:    { ...(existing.foot    || {}), ...foot    },
+      files:   { ...(existing.files   || {}), ...saved   }
+    };
+
+    await fsp.writeFile(jsonPath, JSON.stringify(record, null, 2), 'utf8');
+
+    return new Response(JSON.stringify({
+      ok: true,
+      workorder,
+      dir: `/static/orders/${YY}/${WW}/${NN}`,
+      files: record.files
+    }), { status: 200, headers: { 'Content-Type': 'application/json' } });
 
   } catch (err) {
-    console.error('❌ Failed to write order:', err);
-    return new Response(JSON.stringify({ success: false, error: err.message }), {
-      status: 500,
-      headers: { 'Content-Type': 'application/json' }
+    console.error('submit-order error:', err);
+    return new Response(JSON.stringify({ ok: false, error: String(err?.message ?? err) }), {
+      status: 500, headers: { 'Content-Type': 'application/json' }
     });
   }
 }

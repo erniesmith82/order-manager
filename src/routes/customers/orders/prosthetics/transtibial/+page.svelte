@@ -1,20 +1,23 @@
 <script>
-  import { onMount } from 'svelte';
+  import { onMount, tick } from 'svelte';
   import PrintOrderSummary from '$lib/components/PrintOrderSummary.svelte';
 
   export let data;
 
+  // State
   let user = data?.user ?? { facilities: [] };
-  let workorder = data.workorder;
   let uploadedFile = null;
   let uploadedFileName = '';
+  let submitting = false;
 
-  const now = new Date();
-  const todayFormatted = `${String(now.getMonth() + 1).padStart(2, '0')}/${String(now.getDate()).padStart(2, '0')}/${now.getFullYear()}`;
-  const today = now.toISOString().split('T')[0];
+  const todayFormatted = (() => {
+    const now = new Date();
+    return `${String(now.getMonth() + 1).padStart(2, '0')}/${String(now.getDate()).padStart(2, '0')}/${now.getFullYear()}`;
+  })();
 
+  // Do NOT prefill workorder (server assigns final)
   let order = {
-    workorder: data.workorder,
+    workorder: '',
     receivedDate: todayFormatted,
     shipping: '',
     neededDate: '',
@@ -24,192 +27,338 @@
   };
 
   let patient = {
-    name: '', facility: '', account: '',
+    name: '', facility: '', facilityDetails: null, account: '',
     height: '', weight: '', age: '', practitioner: '',
     sex: '', activity: '', side: [], email: '', phone: ''
   };
 
   let liner = { type: '', size: '', thickness: '' };
-  let foot = { type: '', size: '' };
-  let canSubmit = false;
+  let foot  = { type: '', size: '' };
 
+  let canSubmit = false;
   let errors = {
     name: false, practitioner: false, email: false, phone: false,
-    activity: false, side: false, shipping: false,
-    neededDate: false, receivedDate: false, file: false
+    activity: false, side: false, shipping: false, neededDate: false,
+    receivedDate: false, file: false, age: false
   };
 
+  // ---------- Facilities ----------
+  const norm = (s) => (s ?? '').toString().trim().replace(/\s+/g, ' ').toLowerCase();
+
+  // Accept either facility name (preferred) or id, return details object
+  function resolveFacility(val) {
+    if (!val) return null;
+    const byName = user?.facilities?.find((f) => norm(f.name) === norm(val));
+    if (byName) return byName;
+    return user?.facilities?.find((f) => String(f.id) === String(val)) || null;
+  }
+
+  // Keep details in sync whenever the selected value or user list changes
+  $: patient.facilityDetails = resolveFacility(patient.facility) ?? patient.facilityDetails ?? null;
+
+  onMount(() => {
+    // clear any browser-restored WO text
+    order.workorder = '';
+
+    // default facility to first available (store NAME)
+    if (!patient.facility && user?.facilities?.length) {
+      patient.facility = user.facilities[0].name;
+      patient.facilityDetails = user.facilities[0];
+    }
+
+    try { document.fonts?.ready?.then(() => {}); } catch {}
+    checkFormValidity();
+  });
+
+  // ---------- Validation ----------
   function checkFormValidity() {
     const required = [
-      patient.name, patient.practitioner, patient.email,
-      patient.phone, patient.activity, patient.side, patient.age,
+      patient.name, patient.practitioner, patient.email, patient.phone,
+      patient.activity, patient.side, patient.age,
       order.shipping, order.neededDate, order.receivedDate
     ];
-
-    canSubmit = required.every(f =>
-      (typeof f === 'string' && f.trim() !== '') ||
-      (Array.isArray(f) && f.length > 0)
+    canSubmit = required.every((f) =>
+      (typeof f === 'string' && f.trim() !== '') || (Array.isArray(f) && f.length > 0)
     );
   }
 
- async function handleSubmit() {
-  checkFormValidity();
+  // ---------- Capture ----------
+  const LETTER_W = 1632;
+  const LETTER_H = 2112;
 
-  if (!canSubmit || !uploadedFile) {
-    alert("Please fill out all required fields and upload a file.");
-    return;
+  async function waitForFontsAndImages(container) {
+    try { await document.fonts?.ready; } catch {}
+    const imgs = Array.from(container.querySelectorAll('img'));
+    await Promise.all(imgs.map((img) => img.decode?.().catch(() => {})));
   }
 
-  try {
-    if (typeof window !== 'undefined') {
-      const { toBlob } = await import('dom-to-image-more'); // ✅ Proper destructure
+  function toggleCaptureMode(node, on) {
+    if (!node) return () => {};
+    if (typeof on === 'boolean') on ? node.classList.add('capture-mode') : node.classList.remove('capture-mode');
+    else node.classList.toggle('capture-mode');
+    return () => node.classList.remove('capture-mode');
+  }
 
-      // 📸 Capture workorder diagram (print-area)
-      const workorderElement = document.getElementById('print-area');
-      workorderElement.classList.remove('hidden');
+  function hideFormControls(node) {
+    const els = Array.from(node.querySelectorAll('.no-capture, input[type="file"], button, #submitButton'));
+    const prevs = els.map(el => ({ el, vis: el.style.visibility }));
+    els.forEach(el => (el.style.visibility = 'hidden'));
+    return () => prevs.forEach(({ el, vis }) => (el.style.visibility = vis));
+  }
 
-      const jpgBlob = await toBlob(workorderElement, {
-        quality: 0.95,
-        bgcolor: '#ffffff',
-        width: workorderElement.scrollWidth,
-        height: workorderElement.scrollHeight
-      });
+  function overlaySelectsWithText(node) {
+    const cleanups = [];
+    const selects = node.querySelectorAll('select');
+    selects.forEach((sel) => {
+      const text = sel.options[sel.selectedIndex]?.text ?? '';
+      const fake = document.createElement('span');
+      const cs = getComputedStyle(sel);
+      fake.textContent = text;
+      fake.style.display = 'inline-block';
+      fake.style.whiteSpace = 'nowrap';
+      fake.style.font = cs.font;
+      fake.style.lineHeight = cs.lineHeight;
+      fake.style.color = cs.color || '#111';
+      fake.style.padding = cs.padding;
+      fake.style.margin = cs.margin;
+      fake.style.background = 'transparent';
+      fake.style.border = 'none';
+      fake.style.width = sel.offsetWidth + 'px';
+      fake.style.height = sel.offsetHeight + 'px';
+      fake.className = 'select-fake';
+      const prevVis = sel.style.visibility;
+      sel.style.visibility = 'hidden';
+      sel.parentNode.insertBefore(fake, sel);
+      cleanups.push(() => { fake.remove(); sel.style.visibility = prevVis; });
+    });
+    return () => cleanups.forEach(fn => fn());
+  }
 
-      workorderElement.classList.add('hidden');
-
-      // 📸 Capture order summary as image (print-summary)
-      const summaryElement = document.getElementById('print-summary');
-      summaryElement.classList.remove('hidden');
-
-      const summaryJpgBlob = await toBlob(summaryElement, {
-        quality: 0.95,
-        bgcolor: '#ffffff',
-        width: summaryElement.scrollWidth,
-        height: summaryElement.scrollHeight
-      });
-
-      summaryElement.classList.add('hidden');
-
-      // ✅ File & order metadata
-      uploadedFileName = uploadedFile.name;
-      order.uploadedFileName = uploadedFileName;
-      order.product = 'Transtibial Socket';
-
-      const formData = new FormData();
-      formData.append('file', uploadedFile);
-      formData.append('printFile', jpgBlob, 'workorder.jpg');
-      formData.append('printSummary', summaryJpgBlob, 'order-summary.jpg');
-      formData.append('order', JSON.stringify(order));
-      formData.append('patient', JSON.stringify(patient));
-      formData.append('liner', JSON.stringify(liner));
-      formData.append('foot', JSON.stringify(foot));
-
-      const res = await fetch('/api/submit-order', {
-        method: 'POST',
-        body: formData
-      });
-
-      const result = await res.json();
-
-      if (res.ok && result.success) {
-        alert(`✅ Order ${result.workorder} submitted successfully!`);
-        window.location.href = '/customers/orders';
-      } else {
-        alert("❌ Submission failed.");
+  function materializeTextInputs(node) {
+    const els = node.querySelectorAll('input, textarea');
+    const restore = [];
+    els.forEach((el) => {
+      if (el.tagName === 'TEXTAREA') {
+        const prev = el.textContent;
+        el.textContent = el.value ?? '';
+        restore.push(() => (el.textContent = prev));
+      } else if (!['checkbox','radio','file'].includes(el.type)) {
+        const prev = el.getAttribute('value');
+        el.setAttribute('value', el.value ?? '');
+        restore.push(() => { if (prev == null) el.removeAttribute('value'); else el.setAttribute('value', prev); });
       }
-    }
-  } catch (error) {
-    console.error("❌ Submission error:", error);
-    alert("An error occurred during submission.");
+    });
+    return () => restore.forEach(fn => fn());
   }
-}
 
+  async function captureLetterImage(node, { as = 'dataurl' } = {}) {
+    if (!node) throw new Error('captureLetterImage: node not found');
+    const { toJpeg, toBlob } = await import('dom-to-image-more');
+    await waitForFontsAndImages(node);
+    const offCapture = toggleCaptureMode(node, true);
+    const offHide    = hideFormControls(node);
+    const offInputs  = materializeTextInputs(node);
+    const offSelects = overlaySelectsWithText(node);
+    try {
+      const opts = {
+        bgcolor: '#ffffff',
+        quality: 0.95,
+        width: LETTER_W,
+        height: LETTER_H,
+        filter: (el) => !el.classList?.contains('no-capture'),
+        style: { transform: 'none', filter: 'none', background: '#ffffff' }
+      };
+      return as === 'blob' ? await toBlob(node, opts) : await toJpeg(node, opts);
+    } finally {
+      offSelects(); offInputs(); offHide(); offCapture();
+    }
+  }
+
+  /* ===== 2-Step submit helpers ===== */
+
+  // Step 1: assign official workorder (no files yet)
+  async function assignWorkorderOnly() {
+    const fd = new FormData();
+    fd.append('order',   JSON.stringify(order));
+    fd.append('patient', JSON.stringify(patient));
+    fd.append('liner',   JSON.stringify(liner));
+    fd.append('foot',    JSON.stringify(foot));
+
+    const res = await fetch('/api/submit-order', { method: 'POST', body: fd });
+    const json = await res.json();
+    if (!res.ok || !json?.ok) throw new Error(json?.error || 'Assign failed');
+    return json.workorder; // e.g. "25330001"
+  }
+
+  // Step 2: attach files and captured images to that same workorder
+  async function attachFilesToWorkorder(workorder, jpgBlob, summaryJpgBlob) {
+    uploadedFileName = uploadedFile?.name ?? '';
+    order.uploadedFileName = uploadedFileName;
+
+    const fd = new FormData();
+    fd.append('forceWorkorder', workorder); // use pre-assigned folder
+
+    // keep JSON in sync
+    fd.append('order',   JSON.stringify(order));
+    fd.append('patient', JSON.stringify(patient));
+    fd.append('liner',   JSON.stringify(liner));
+    fd.append('foot',    JSON.stringify(foot));
+
+    if (uploadedFile)   fd.append('uploadedFile', uploadedFile, uploadedFile.name);
+    if (jpgBlob)        fd.append('jpg', jpgBlob, 'workorder.jpg');
+    if (summaryJpgBlob) fd.append('summaryJpg', summaryJpgBlob, 'order-summary.jpg');
+
+    const res = await fetch('/api/submit-order', { method: 'POST', body: fd });
+    const json = await res.json();
+    if (!res.ok || !json?.ok) throw new Error(json?.error || 'Attach failed');
+    return json;
+  }
+
+  // Submit handler (2-step)
+  async function handleSubmit() {
+    if (submitting) return;
+    checkFormValidity();
+    if (!canSubmit || !uploadedFile) {
+      alert('Please fill out all required fields and upload a file.');
+      return;
+    }
+    submitting = true;
+    try {
+      // 1) Assign official workorder on server
+      const wo = await assignWorkorderOnly();
+      order.workorder = wo;     // show it on the form
+      await tick();             // ensure DOM updates before capture
+
+      // 2) Capture with official number visible
+      const workorderElement = document.getElementById('print-area');
+      const summaryElement   = document.getElementById('print-summary');
+      const jpgBlob        = await captureLetterImage(workorderElement, { as: 'blob' });
+      const summaryJpgBlob = summaryElement ? await captureLetterImage(summaryElement, { as: 'blob' }) : null;
+
+      // 3) Attach files to that same WO folder
+      await attachFilesToWorkorder(wo, jpgBlob, summaryJpgBlob);
+
+      alert(`✅ Order ${wo} submitted successfully!`);
+      window.location.href = '/customers/orders';
+    } catch (err) {
+      console.error('❌ Submission error:', err);
+      alert(err?.message || 'An error occurred during submission.');
+    } finally {
+      submitting = false;
+    }
+  }
 </script>
 
 
+
 <style global>
-  @media print {
-    @page {
-      size: 8.5in 11in;
-      margin: 10px;
-    }
-    body * {
-      visibility: hidden;
-    }
-@media print {
-  .no-print,
-  #admin-sidebar {
+   /* Base border for all elements in capture-mode */
+  :global(#print-area.capture-mode *) {
+    border: 1px solid #d1d5e1 !important;
+  }
+
+  /* Remove borders from divs without explicit border classes */
+  :global(#print-area.capture-mode div:not(.border):not([class*="border-"])) {
+    border: none !important;
+  }
+
+  /* Remove borders from text/content elements */
+  :global(#print-area.capture-mode :is(
+    p, span, strong, em, small, b, i, u,
+    h1, h2, h3, h4, h5, h6, label, a
+  )) {
+    border: none !important;
+  }
+
+  /* Remove borders from images */
+  :global(#print-area.capture-mode img) {
+    border: none !important;
+  }
+
+  /* Restyle checkboxes */
+  :global(#print-area.capture-mode input[type="checkbox"]) {
+    appearance: none !important;
+    -webkit-appearance: none !important;
+    width: 14px;
+    height: 14px;
+    border: 1px solid #cbd5e1 !important;
+    background: #fff !important;
+    position: relative;
+    vertical-align: middle;
+  }
+
+  :global(#print-area.capture-mode input[type="checkbox"]:checked::after) {
+    content: "✔";
+    position: absolute;
+    left: 2px;
+    top: -1px;
+    font-size: 12px;
+    line-height: 14px;
+    color: #111;
+  }
+
+  /* Make inputs/selects transparent and clean */
+  :global(#print-area.capture-mode input),
+  :global(#print-area.capture-mode select) {
+    border: hidden !important;
+    background: transparent !important;
+    color: #111 !important;
+    outline: none !important;
+    box-shadow: none !important;
+  }
+
+  /* Hide submit button */
+  :global(#print-area.capture-mode #submitButton) {
     display: none !important;
-    visibility: hidden !important;
   }
 
-  body * {
-    visibility: hidden !important;
+  /* Scale & center the form wrapper for capture */
+  :global(#print-area.capture-mode #form-wrapper) {
+    margin-left: 17%;
+    margin-top: 18.5%;
+    transform: scale(1.13);
+    transform-origin: center;
   }
 
-  #print-clean,
-  #print-clean * {
-    visibility: visible !important;
+  /* =========================
+     ORDER SUMMARY (Letter)
+     ========================= */
+
+  /* Force true Letter canvas for summary capture (on-screen off-canvas) */
+  :global(#print-summary.capture-mode),
+  :global(#print-summary-capture.capture-mode) {
+    width: 8.5in;
+    height: 11in;
+    padding: 0.4in;
+    box-sizing: border-box;
+    background: #fff !important;
+    transform: none !important;
   }
 
-#print-area {
-  width: 8.5in;
-  height: 10in;
-  transform: scale(0.9);           /* Shrink to 90% size */
-  transform-origin: top left;
-  padding: 0.2in 0.5in 0.2in 0.2in; /* Smaller left padding */
-  background: white;
-  box-sizing: border-box;
-  margin-left: -275px;
-  margin-top: -270px;
-  margin-right: 200px;
-}
+  /* Clean rendering inside summary during capture */
+  :global(#print-summary.capture-mode *),
+  :global(#print-summary-capture.capture-mode *) {
+    box-shadow: none !important;
+    outline: none !important;
+  }
 
+  /* Soften table borders in summary (optional but looks better) */
+  :global(#print-summary.capture-mode table),
+  :global(#print-summary.capture-mode td),
+  :global(#print-summary.capture-mode th),
+  :global(#print-summary-capture.capture-mode table),
+  :global(#print-summary-capture.capture-mode td),
+  :global(#print-summary-capture.capture-mode th) {
+    border-color: #d1d5e1 !important;
+  }
 
-}
-
-
-
-    input,
-    textarea,
-    select {
-      border: none !important;
-      background: transparent !important;
-      font-weight: bold !important;
-      font-size: inherit !important;
-      color: #000 !important;
-    }
-
-    input[type="date"]::-webkit-calendar-picker-indicator {
-      display: none;
-      -webkit-appearance: none;
-    }
-
-    input[type="date"] {
-      background: none;
-    }
-
-    input[type="checkbox"]:checked::before {
-      content: "✔";
-      position: absolute;
-      font-size: 10px;
-      top: -2px;
-      left: 1px;
-    }
-
-    #logo {
-      height: 250px !important;
-      max-width: 100% !important;
-    }
-#legend{
-  margin-top: -150px;
-}
-#notes{
-  margin-top: -50px;
-}
-    
+  /* Images in summary: no borders */
+  :global(#print-summary.capture-mode img),
+  :global(#print-summary-capture.capture-mode img) {
+    border: none !important;
   }
 </style>
+
 
 
 <!-- File Upload Input -->
@@ -223,26 +372,30 @@
         Upload File:
       </label>
 
-      <!-- ✅ Custom label area -->
-  {#if order.uploadedFileName}
-  <p class="text-sm font-bold text-[rgba(21,128,61,1)] mb-2">{order.uploadedFileName}</p>
-{/if}
+      {#if order.uploadedFileName}
+        <p class="text-sm font-bold text-[rgba(21,128,61,1)] mb-2">
+          {order.uploadedFileName}
+        </p>
+      {/if}
+
       <input
         id="fileUpload"
         type="file"
         required
         on:change={(e) => {
-          uploadedFile = e.target.files[0];
+          uploadedFile = e.target.files?.[0] || null;
           uploadedFileName = uploadedFile?.name || '';
+          order.uploadedFileName = uploadedFileName;
+          checkFormValidity();
         }}
         class="block w-full text-sm text-[rgba(55,65,81,1)] border border-[rgba(209,213,219,1)] rounded py-2 px-3 file:opacity-0 file:absolute file:h-0"
       />
     </div>
   </div>
 
-<!-- start of form -->
-<div  id="print-area" >
-<div id="form-wrapper" class="scale-[1.2] origin-top w-[1100px] p-15 mx-auto mt-3 bg-white">
+  <!-- start of form -->
+  <div id="print-area">
+    <div id="form-wrapper" class="scale-[1.2] origin-top w-[1100px] p-15 mx-auto mt-3 bg-white">
 
 <div class="bg-white text-black text-[12px] leading-tight">
 
@@ -261,7 +414,6 @@
     FABRICATION ORDER
   </div>
 </div>
-
 
 </div>
 
@@ -284,7 +436,17 @@
       <div class="border border-gray-400 p-2 w-[14%] h-16 text-center font-bold text-[#f58220]">PATIENT<br />INFORMATION</div>
     <div class="border border-gray-400 p-2 w-[25%] h-16">
   <label class="block text-xs font-bold -mt-2 text-[#f58220]">Workorder Number</label>
-  <input type="text" bind:value={order.workorder} readonly class="w-full h-full font-bold text-2xl" />
+<input
+  id="workorderInput"
+  type="text"
+  bind:value={order.workorder}
+  placeholder={data?.workorderHint || 'Assigned on submit'}
+  readonly
+  autocomplete="off"
+  class="w-full h-full font-bold text-2xl"
+/>
+
+
 
 </div>
       <div class="border border-gray-400 p-2 w-[14%] h-16 text-center font-bold text-[#f58220]">CUSTOMER<br />INFORMATION</div>
@@ -338,25 +500,23 @@
       <label class="block text-xs font-semibold -mt-2">Patient Name</label>
       <input bind:value={patient.name} required on:input={checkFormValidity} class={`w-full h-full ${errors.name ? 'border-2 border-red-500' : ''}`}  />
     </div>
-    <div class="border border-gray-400 p-2 w-[33%] h-12">
-{#if user?.facilities?.length}
-  <label class="block text-xs font-semibold -mt-2">Facility</label>
-  <select
-    bind:value={patient.facility}
-    class="w-full h-full border border-gray-300 rounded p-1 text-sm"
-  >
-    <option value="" disabled selected>Select a facility</option>
+   <div class="border border-gray-400 p-2 w-[33%] h-12">
+  {#if user?.facilities?.length}
+    <label class="block text-xs font-semibold -mt-2">Facility</label>
+    <select
+      bind:value={patient.facility}   
+      class="w-full h-full border border-gray-300 rounded p-1 text-sm"
+    >
+      <option value="" disabled>Select a facility</option>
+      {#each user.facilities as f}
+        <option value={f.name}>{f.name}</option>
+      {/each}
+    </select>
+  {:else}
+    <p class="text-sm italic text-gray-500">No facilities found</p>
+  {/if}
+</div>
 
-    {#each user.facilities as facility}
-      <option value={facility.name}>{facility.name}</option>
-    {/each}
-  </select>
-{:else}
-  <p class="text-sm italic text-gray-500">No facilities found</p>
-{/if}
-
-
-    </div>
     <div class="border border-gray-400 p-2 w-[28%] h-12">
       <label class="block text-xs font-semibold -mt-2">Account Number</label>
       <input bind:value={patient.account} class="w-full h-full" />
@@ -495,9 +655,7 @@
     </div>
   </div>
 </div>
-
-
-  <!-- Notes Section -->
+ <!-- Notes Section -->
   <div class="mt-4" id="notes">
     <h3 class="text-2xl font-bold text-[#f58220] border-b pb-1">Notes and Modification Instructions</h3>
     <div class="border border-dashed border-gray-400 h-24 p-2 mt-1 text-sm">
@@ -510,41 +668,27 @@
     </div>
   </div>
 </div>
-  <!-- Footer -->
-  <div class="text-center text-lg mt-4">
-   <div class="text-center mt-6 no-print">
-<button
-  on:click={() => {
-    console.log("Submit button clicked");
-    handleSubmit();
-  }}
-  class="bg-[#f58220] text-white font-bold py-2 px-6 rounded hover:bg-[#e4711a] transition"
->
-  Submit Order
-</button>
-
-
-</div>
-
-    <p class="mt-2 text-sm">
-      2480 West 82nd Street | Hialeah, FL 33016 | 305.823.8300 | 877.246.2884 | www.biosculptor.com
-    </p>
+   <!-- Footer -->
+      <div class="text-center text-lg mt-4">
+        <div id="submitButton" class="text-center mt-6">
+          <button
+            type="button"
+            on:click={handleSubmit}
+            class="bg-[#f58220] text-white font-bold py-2 px-6 rounded hover:bg-[#e4711a] transition"
+          >
+            Submit Order
+          </button>
+        </div>
+        <p class="mt-2 text-sm">
+          2480 West 82nd Street | Hialeah, FL 33016 | 305.823.8300 | 877.246.2884 | www.biosculptor.com
+        </p>
+      </div>
+    </div>
   </div>
 </div>
-</div>
-</div>
-</div>
 
-<div
-  id="print-summary"
-  class="hidden print-clean bg-white text-black px-10 py-8 text-sm leading-tight"
->
-
-  <PrintOrderSummary
-    {order}
-    {patient}
-    {liner}
-    {foot}
-    uploadedFileName={uploadedFileName}
-  />
+<!-- Hidden print summary -->
+<div id="print-summary" style="position:fixed; left:-10000px; top:0;">
+  <PrintOrderSummary {order} {patient} {liner} {foot} uploadedFileName={uploadedFileName} />
+</div>
 </div>

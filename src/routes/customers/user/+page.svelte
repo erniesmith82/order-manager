@@ -5,16 +5,24 @@
 
   let user = null;
 
+  // helper to generate a safe id from name
+  function nameToId(name) {
+    return name
+      .toLowerCase()
+      .trim()
+      .replace(/\s+/g, '-')
+      .replace(/[^a-z0-9-]/g, '');
+  }
+
   onMount(() => {
     user = getCurrentUser();
     if (!user) goto('/login');
 
-    // ✅ Ensure facilities array exists and contains structured entries
     if (!user.facilities || !Array.isArray(user.facilities)) {
       user = {
         ...user,
         facilities: [
-          { name: '', address: '', city: '', state: '', zip: '' }
+          { id: '', name: '', address: '', city: '', state: '', zip: '' }
         ]
       };
     }
@@ -27,12 +35,9 @@
     const formData = new FormData();
     formData.append('avatar', file);
 
-    const res = await fetch('/api/upload/avatar', {
-      method: 'POST',
-      body: formData
-    });
-
+    const res = await fetch('/api/upload/avatar', { method: 'POST', body: formData });
     const result = await res.json();
+
     if (result.avatar) {
       user.avatar = result.avatar;
     } else {
@@ -43,16 +48,22 @@
   function addFacility() {
     user.facilities = [
       ...user.facilities,
-      { name: '', address: '', city: '', state: '', zip: '' }
+      { id: '', name: '', address: '', city: '', state: '', zip: '' }
     ];
   }
 
   function removeFacility(index) {
     user.facilities.splice(index, 1);
-    user.facilities = [...user.facilities]; // trigger reactivity
+    user.facilities = [...user.facilities];
   }
 
   async function saveChanges() {
+    // ensure all facilities have IDs before saving
+    user.facilities = user.facilities.map(fac => ({
+      ...fac,
+      id: fac.id || nameToId(fac.name)
+    }));
+
     const res = await fetch('/api/users/update', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
