@@ -5,7 +5,7 @@
   export let data;
 
   // State
-  let user = data?.user ?? { facilities: [] };
+  let user = data?.user ?? { id: null, facilities: [] };
   let uploadedFile = null;
   let uploadedFileName = '';
   let submitting = false;
@@ -56,14 +56,34 @@
   // Keep details in sync whenever the selected value or user list changes
   $: patient.facilityDetails = resolveFacility(patient.facility) ?? patient.facilityDetails ?? null;
 
-  onMount(() => {
+  // STEP 3: Refresh user (and facilities) on the client after SSR, then set defaults safely
+  onMount(async () => {
     // clear any browser-restored WO text
     order.workorder = '';
 
-    // default facility to first available (store NAME)
-    if (!patient.facility && user?.facilities?.length) {
-      patient.facility = user.facilities[0].name;
-      patient.facilityDetails = user.facilities[0];
+    try {
+      if (user?.id) {
+        const res = await fetch(`/api/users/${user.id}`);
+        if (res.ok) {
+          const fresh = await res.json();
+          user = { ...fresh, facilities: Array.isArray(fresh.facilities) ? fresh.facilities : [] };
+        }
+      }
+    } catch (e) {
+      console.error('Failed to refresh user facilities:', e);
+    }
+
+    // If no facility chosen, or chosen facility no longer exists, default to first available
+    if (user?.facilities?.length) {
+      const exists = resolveFacility(patient.facility);
+      if (!exists) {
+        patient.facility = user.facilities[0].name ?? user.facilities[0].id;
+        patient.facilityDetails = user.facilities[0];
+      }
+    } else {
+      // no facilities available; ensure cleared
+      patient.facility = '';
+      patient.facilityDetails = null;
     }
 
     try { document.fonts?.ready?.then(() => {}); } catch {}
@@ -176,7 +196,6 @@
 
   /* ===== 2-Step submit helpers ===== */
 
-  // Step 1: assign official workorder (no files yet)
   async function assignWorkorderOnly() {
     const fd = new FormData();
     fd.append('order',   JSON.stringify(order));
@@ -190,7 +209,6 @@
     return json.workorder; // e.g. "25330001"
   }
 
-  // Step 2: attach files and captured images to that same workorder
   async function attachFilesToWorkorder(workorder, jpgBlob, summaryJpgBlob) {
     uploadedFileName = uploadedFile?.name ?? '';
     order.uploadedFileName = uploadedFileName;
@@ -357,8 +375,38 @@
   :global(#print-summary-capture.capture-mode img) {
     border: none !important;
   }
-</style>
 
+  
+   :global(#print-summary div) {
+    border: none !important;
+  }
+
+    /* During capture, remove borders/boxes around text elements */
+  :global(#print-summary.capture-mode :where(
+    p, span, strong, em, small, label, li, a,
+    h1, h2, h3, h4, h5, h6, blockquote
+  )) {
+    border: none !important;
+    outline: none !important;
+    box-shadow: none !important;
+    background: transparent !important;
+  }
+
+  /* If you also nuked div borders earlier, keep that too */
+  :global(#print-summary.capture-mode div) {
+    border: none !important;
+  }
+
+  /* Optional: ignore Tailwind rings that can look like borders */
+  :global(#print-summary.capture-mode [class*="ring-"]) {
+    box-shadow: none !important;
+  }
+
+  /* Keep horizontal rules if you use them for separators */
+  :global(#print-summary.capture-mode hr) {
+    border-color: #000 !important; /* or whatever you want to keep */
+  }
+</style>
 
 
 <!-- File Upload Input -->
@@ -500,18 +548,21 @@
       <label class="block text-xs font-semibold -mt-2">Patient Name</label>
       <input bind:value={patient.name} required on:input={checkFormValidity} class={`w-full h-full ${errors.name ? 'border-2 border-red-500' : ''}`}  />
     </div>
-   <div class="border border-gray-400 p-2 w-[33%] h-12">
-  {#if user?.facilities?.length}
+  <div class="border border-gray-400 p-2 w-[33%] h-12">
+  {#if user.facilities?.length}
     <label class="block text-xs font-semibold -mt-2">Facility</label>
-    <select
-      bind:value={patient.facility}   
-      class="w-full h-full border border-gray-300 rounded p-1 text-sm"
-    >
-      <option value="" disabled>Select a facility</option>
-      {#each user.facilities as f}
-        <option value={f.name}>{f.name}</option>
-      {/each}
-    </select>
+<select
+  bind:value={patient.facility}
+  class="w-full h-full border border-gray-300 rounded p-1 text-sm"
+  required
+>
+  <option value="" disabled>Select a facility</option>
+  {#each user.facilities as f}
+    <!-- use name as the value, since there's no id in users.json -->
+    <option value={f.name}>{f.name}</option>
+  {/each}
+</select>
+
   {:else}
     <p class="text-sm italic text-gray-500">No facilities found</p>
   {/if}
@@ -688,7 +739,7 @@
 </div>
 
 <!-- Hidden print summary -->
-<div id="print-summary" style="position:fixed; left:-10000px; top:0;">
-  <PrintOrderSummary {order} {patient} {liner} {foot} uploadedFileName={uploadedFileName} />
+<div id="print-summary" style="position:fixed; left:-10000px; top:0; ">
+  <PrintOrderSummary  uploadedFileName={uploadedFileName} />
 </div>
 </div>

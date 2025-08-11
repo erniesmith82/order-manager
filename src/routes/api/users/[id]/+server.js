@@ -3,7 +3,9 @@
 import fs from 'fs/promises';
 import path from 'path';
 
-const USERS_FILE = path.resolve('src/lib/server/data/users.json');
+// src/routes/api/users/[id]/+server.js
+const USERS_FILE = path.resolve('static', 'data', 'users.json'); // <-- adjust to where your file truly is
+
 
 async function readUsers() {
   const data = await fs.readFile(USERS_FILE, 'utf-8');
