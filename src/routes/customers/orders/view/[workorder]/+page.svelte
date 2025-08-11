@@ -13,12 +13,12 @@
   <div class="mt-4 flex flex-col items-center justify-center text-center space-y-8">
     <h2 class="text-xl font-semibold mb-4">Printable Order Form</h2>
 
-      <PrintOrderSummary
-        order={order.order}
-        patient={order.patient}
-        liner={order.liner}
-        foot={order.foot}
-      />
+<OrderSummary
+  order={order.order}
+  patient={order.patient}
+  facility={order.patient?.facilityDetails}
+/>
+
   
   </div>
 {/if}

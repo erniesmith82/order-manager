@@ -1,0 +1,53 @@
+{
+  "workorder": "25330007",
+  "YY": "25",
+  "WW": "33",
+  "NN": "07",
+  "createdAt": "2025-08-11T00:00:00.000Z",
+  "patient": {
+    "name": "hhh",
+    "facility": "BGRN Industries",
+    "facilityDetails": {
+      "name": "BGRN Industries",
+      "address": "4505 NW 165 ST",
+      "city": "OPA LOCKA ",
+      "state": "FL ",
+      "zip": "33054"
+    },
+    "account": "h",
+    "height": "h",
+    "weight": "h",
+    "age": "h",
+    "practitioner": "h",
+    "sex": "h",
+    "activity": "h",
+    "side": [
+      "left"
+    ],
+    "email": "h",
+    "phone": "h"
+  },
+  "order": {
+    "workorder": "25330007",
+    "receivedDate": "08/11/2025",
+    "shipping": "UPS Ground",
+    "neededDate": "2025-08-28",
+    "uploadedFileName": "NopLogo.png",
+    "product": "Transtibial Socket",
+    "comment": ""
+  },
+  "liner": {
+    "type": "",
+    "size": "",
+    "thickness": ""
+  },
+  "foot": {
+    "type": "",
+    "size": ""
+  },
+  "files": {
+    "uploadedFile": "NopLogo.png",
+    "jpg": "workorder.jpg",
+    "summaryJpg": "order-summary.jpg"
+  }
+}

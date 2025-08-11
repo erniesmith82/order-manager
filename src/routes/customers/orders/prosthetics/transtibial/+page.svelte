@@ -350,7 +350,11 @@
     padding: 0.4in;
     box-sizing: border-box;
     background: #fff !important;
-    transform: none !important;
+      display: flex;
+  flex-direction: column;
+  justify-content: center;
+  transform: scale(2.5); /* Increase size — try 1.3 to 1.5 */
+  transform-origin: top left;
   }
 
   /* Clean rendering inside summary during capture */
@@ -406,6 +410,20 @@
   :global(#print-summary.capture-mode hr) {
     border-color: #000 !important; /* or whatever you want to keep */
   }
+
+#print-summary
+{
+    position: fixed;
+  left: -10000px;
+  top: 0;
+  width: 1632px;   /* Letter width @ 192 DPI */
+  height: 2112px;  /* Letter height @ 192 DPI */
+  background: #fff;
+  box-sizing: border-box;
+  padding: 64px;   /* inner margins */
+  transform-origin: top left;
+}
+
 </style>
 
 
@@ -739,7 +757,7 @@
 </div>
 
 <!-- Hidden print summary -->
-<div id="print-summary" style="position:fixed; left:-10000px; top:0; ">
+<div id="print-summary">
   <PrintOrderSummary  uploadedFileName={uploadedFileName} />
 </div>
 </div>
