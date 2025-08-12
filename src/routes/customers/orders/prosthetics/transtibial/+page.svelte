@@ -1,9 +1,10 @@
 <script>
-   import { onMount, tick, mount } from 'svelte';
+  import { onMount, tick } from 'svelte';
   import PrintOrderSummary from '$lib/components/PrintOrderSummary.svelte';
 
   export let data;
 
+  // State
   let user = data?.user ?? { id: null, facilities: [] };
   let uploadedFile = null;
   let uploadedFileName = '';
@@ -14,6 +15,7 @@
     return `${String(now.getMonth() + 1).padStart(2, '0')}/${String(now.getDate()).padStart(2, '0')}/${now.getFullYear()}`;
   })();
 
+  // Do NOT prefill workorder (server assigns final)
   let order = {
     workorder: '',
     receivedDate: todayFormatted,
@@ -21,19 +23,13 @@
     neededDate: '',
     uploadedFileName: '',
     product: 'Transtibial Socket',
-    customerPO: '',
-    type: 'Standard',
-    quantity: '1',
-    shipDate: '',
-    deliveryDate: '',
     comment: ''
   };
 
   let patient = {
     name: '', facility: '', facilityDetails: null, account: '',
     height: '', weight: '', age: '', practitioner: '',
-    sex: '', activity: '', side: [], email: '', phone: '',
-    address: '', city: '', state: '', zip: ''
+    sex: '', activity: '', side: [], email: '', phone: ''
   };
 
   let liner = { type: '', size: '', thickness: '' };
@@ -46,8 +42,10 @@
     receivedDate: false, file: false, age: false
   };
 
+  // ---------- Facilities ----------
   const norm = (s) => (s ?? '').toString().trim().replace(/\s+/g, ' ').toLowerCase();
 
+  // Accept either facility name (preferred) or id, return details object
   function resolveFacility(val) {
     if (!val) return null;
     const byName = user?.facilities?.find((f) => norm(f.name) === norm(val));
@@ -55,12 +53,12 @@
     return user?.facilities?.find((f) => String(f.id) === String(val)) || null;
   }
 
+  // Keep details in sync whenever the selected value or user list changes
   $: patient.facilityDetails = resolveFacility(patient.facility) ?? patient.facilityDetails ?? null;
 
+  // STEP 3: Refresh user (and facilities) on the client after SSR, then set defaults safely
   onMount(async () => {
-    // make sure capture class isn't stuck on
-    document.getElementById('print-area')?.classList.remove('capture-mode');
-
+    // clear any browser-restored WO text
     order.workorder = '';
 
     try {
@@ -75,6 +73,7 @@
       console.error('Failed to refresh user facilities:', e);
     }
 
+    // If no facility chosen, or chosen facility no longer exists, default to first available
     if (user?.facilities?.length) {
       const exists = resolveFacility(patient.facility);
       if (!exists) {
@@ -82,6 +81,7 @@
         patient.facilityDetails = user.facilities[0];
       }
     } else {
+      // no facilities available; ensure cleared
       patient.facility = '';
       patient.facilityDetails = null;
     }
@@ -90,21 +90,19 @@
     checkFormValidity();
   });
 
+  // ---------- Validation ----------
   function checkFormValidity() {
     const required = [
       patient.name, patient.practitioner, patient.email, patient.phone,
       patient.activity, patient.side, patient.age,
       order.shipping, order.neededDate, order.receivedDate
-    ].map(v => (typeof v === 'number' ? String(v) : v)); // guard numeric fields
+    ];
     canSubmit = required.every((f) =>
       (typeof f === 'string' && f.trim() !== '') || (Array.isArray(f) && f.length > 0)
     );
   }
 
-  $: if (uploadedFile?.name && order.uploadedFileName !== uploadedFile.name) {
-    order.uploadedFileName = uploadedFile.name;
-  }
-
+  // ---------- Capture ----------
   const LETTER_W = 1632;
   const LETTER_H = 2112;
 
@@ -121,17 +119,12 @@
     return () => node.classList.remove('capture-mode');
   }
 
-  // ⬇️ do NOT hide every <button>; only hide file input + the submit wrapper
-function hideFormControls(node) {
-  // Hide only explicit no-capture elements, the file input, and the submit wrapper
-  const els = Array.from(
-    node.querySelectorAll('.no-capture, input[type="file"], #submitButton')
-  );
-  const prevs = els.map(el => ({ el, vis: el.style.visibility }));
-  els.forEach(el => (el.style.visibility = 'hidden'));
-  return () => prevs.forEach(({ el, vis }) => (el.style.visibility = vis));
-}
-
+  function hideFormControls(node) {
+    const els = Array.from(node.querySelectorAll('.no-capture, input[type="file"], button, #submitButton'));
+    const prevs = els.map(el => ({ el, vis: el.style.visibility }));
+    els.forEach(el => (el.style.visibility = 'hidden'));
+    return () => prevs.forEach(({ el, vis }) => (el.style.visibility = vis));
+  }
 
   function overlaySelectsWithText(node) {
     const cleanups = [];
@@ -141,19 +134,17 @@ function hideFormControls(node) {
       const fake = document.createElement('span');
       const cs = getComputedStyle(sel);
       fake.textContent = text;
-      Object.assign(fake.style, {
-        display: 'inline-block',
-        whiteSpace: 'nowrap',
-        font: cs.font,
-        lineHeight: cs.lineHeight,
-        color: cs.color || '#111',
-        padding: cs.padding,
-        margin: cs.margin,
-        background: 'transparent',
-        border: 'none',
-        width: sel.offsetWidth + 'px',
-        height: sel.offsetHeight + 'px'
-      });
+      fake.style.display = 'inline-block';
+      fake.style.whiteSpace = 'nowrap';
+      fake.style.font = cs.font;
+      fake.style.lineHeight = cs.lineHeight;
+      fake.style.color = cs.color || '#111';
+      fake.style.padding = cs.padding;
+      fake.style.margin = cs.margin;
+      fake.style.background = 'transparent';
+      fake.style.border = 'none';
+      fake.style.width = sel.offsetWidth + 'px';
+      fake.style.height = sel.offsetHeight + 'px';
       fake.className = 'select-fake';
       const prevVis = sel.style.visibility;
       sel.style.visibility = 'hidden';
@@ -203,32 +194,7 @@ function hideFormControls(node) {
     }
   }
 
-function mountSummaryForCapture(props) {
-  const host = document.createElement('div');
-  Object.assign(host.style, {
-    position: 'fixed',
-    left: '-10000px',
-    top: '0',
-    width: '1632px',
-    height: '2112px',
-    background: '#fff',
-    padding: '64px',
-    boxSizing: 'border-box'
-  });
-  document.body.appendChild(host);
-
-  const instance = mount(PrintOrderSummary, { target: host, props });
-  return {
-    host,
-    destroy() {
-      // Svelte 5: instance.destroy();  Svelte 3/4: instance.$destroy()
-      try { instance.destroy?.(); } catch {}
-      try { instance.$destroy?.(); } catch {}
-      host.remove();
-    }
-  };
-}
-
+  /* ===== 2-Step submit helpers ===== */
 
   async function assignWorkorderOnly() {
     const fd = new FormData();
@@ -240,7 +206,7 @@ function mountSummaryForCapture(props) {
     const res = await fetch('/api/submit-order', { method: 'POST', body: fd });
     const json = await res.json();
     if (!res.ok || !json?.ok) throw new Error(json?.error || 'Assign failed');
-    return json.workorder;
+    return json.workorder; // e.g. "25330001"
   }
 
   async function attachFilesToWorkorder(workorder, jpgBlob, summaryJpgBlob) {
@@ -248,7 +214,9 @@ function mountSummaryForCapture(props) {
     order.uploadedFileName = uploadedFileName;
 
     const fd = new FormData();
-    fd.append('forceWorkorder', workorder);
+    fd.append('forceWorkorder', workorder); // use pre-assigned folder
+
+    // keep JSON in sync
     fd.append('order',   JSON.stringify(order));
     fd.append('patient', JSON.stringify(patient));
     fd.append('liner',   JSON.stringify(liner));
@@ -264,6 +232,7 @@ function mountSummaryForCapture(props) {
     return json;
   }
 
+  // Submit handler (2-step)
   async function handleSubmit() {
     if (submitting) return;
     checkFormValidity();
@@ -273,52 +242,18 @@ function mountSummaryForCapture(props) {
     }
     submitting = true;
     try {
+      // 1) Assign official workorder on server
       const wo = await assignWorkorderOnly();
-      order.workorder = wo;
-      await tick();
+      order.workorder = wo;     // show it on the form
+      await tick();             // ensure DOM updates before capture
 
+      // 2) Capture with official number visible
       const workorderElement = document.getElementById('print-area');
-      const jpgBlob          = await captureLetterImage(workorderElement, { as: 'blob' });
+      const summaryElement   = document.getElementById('print-summary');
+      const jpgBlob        = await captureLetterImage(workorderElement, { as: 'blob' });
+      const summaryJpgBlob = summaryElement ? await captureLetterImage(summaryElement, { as: 'blob' }) : null;
 
-      const summaryProps = {
-        order: {
-          workorder:        order.workorder,
-          neededDate:       order.neededDate,
-          receivedDate:     order.receivedDate,
-          shipping:         order.shipping,
-          product:          order.product,
-          uploadedFileName: order.uploadedFileName,
-          customerPO:       order.customerPO,
-          type:             order.type ?? 'Standard',
-          quantity:         order.quantity ?? '1',
-          shipDate:         order.shipDate,
-          deliveryDate:     order.deliveryDate,
-          comment:          order.comment
-        },
-        patient: {
-          name: patient.name,
-          account: patient.account,
-          practitioner: patient.practitioner,
-          email: patient.email,
-          facility: patient.facility,
-          facilityDetails: patient.facilityDetails,
-          address: patient.address,
-          city: patient.city,
-          state: patient.state,
-          zip: patient.zip
-        },
-        uploadedFileName: order?.uploadedFileName || uploadedFileName
-      };
-
-      const { host, destroy } = mountSummaryForCapture(summaryProps);
-      let summaryJpgBlob = null;
-      try {
-        await waitForFontsAndImages(host);
-        summaryJpgBlob = await captureLetterImage(host, { as: 'blob' });
-      } finally {
-        destroy();
-      }
-
+      // 3) Attach files to that same WO folder
       await attachFilesToWorkorder(wo, jpgBlob, summaryJpgBlob);
 
       alert(`✅ Order ${wo} submitted successfully!`);
@@ -332,68 +267,126 @@ function mountSummaryForCapture(props) {
   }
 </script>
 
+
+
 <style global>
-  /* WORKORDER CAPTURE */
-  :global(#print-area.capture-mode *) { border: 1px solid #d1d5e1 !important; }
-  :global(#print-area.capture-mode div:not(.border):not([class*="border-"])) { border: none !important; }
-  :global(#print-area.capture-mode :is(p, span, strong, em, small, b, i, u, h1, h2, h3, h4, h5, h6, label, a)) { border: none !important; }
-  :global(#print-area.capture-mode img) { border: none !important; }
+   /* Base border for all elements in capture-mode */
+  :global(#print-area.capture-mode *) {
+    border: 1px solid #d1d5e1 !important;
+  }
+
+  /* Remove borders from divs without explicit border classes */
+  :global(#print-area.capture-mode div:not(.border):not([class*="border-"])) {
+    border: none !important;
+  }
+
+  /* Remove borders from text/content elements */
+  :global(#print-area.capture-mode :is(
+    p, span, strong, em, small, b, i, u,
+    h1, h2, h3, h4, h5, h6, label, a
+  )) {
+    border: none !important;
+  }
+
+  /* Remove borders from images */
+  :global(#print-area.capture-mode img) {
+    border: none !important;
+  }
+
+  /* Restyle checkboxes */
   :global(#print-area.capture-mode input[type="checkbox"]) {
-    appearance: none !important; -webkit-appearance: none !important;
-    width: 14px; height: 14px; border: 1px solid #cbd5e1 !important; background: #fff !important;
-    position: relative; vertical-align: middle;
+    appearance: none !important;
+    -webkit-appearance: none !important;
+    width: 14px;
+    height: 14px;
+    border: 1px solid #cbd5e1 !important;
+    background: #fff !important;
+    position: relative;
+    vertical-align: middle;
   }
+
   :global(#print-area.capture-mode input[type="checkbox"]:checked::after) {
-    content: "✔"; position: absolute; left: 2px; top: -1px; font-size: 12px; line-height: 14px; color: #111;
+    content: "✔";
+    position: absolute;
+    left: 2px;
+    top: -1px;
+    font-size: 12px;
+    line-height: 14px;
+    color: #111;
   }
+
+  /* Make inputs/selects transparent and clean */
   :global(#print-area.capture-mode input),
   :global(#print-area.capture-mode select) {
-    border: hidden !important; background: transparent !important; color: #111 !important;
-    outline: none !important; box-shadow: none !important;
+    border: hidden !important;
+    background: transparent !important;
+    color: #111 !important;
+    outline: none !important;
+    box-shadow: none !important;
   }
- 
+
+  /* Hide submit button */
+  :global(#print-area.capture-mode #submitButton) {
+    display: none !important;
+  }
+
+  /* Scale & center the form wrapper for capture */
   :global(#print-area.capture-mode #form-wrapper) {
-    margin-left: 17%; margin-top: 18.5%; transform: scale(1.13); transform-origin: center;
+    margin-left: 17%;
+    margin-top: 18.5%;
+    transform: scale(1.13);
+    transform-origin: center;
   }
 
-  /* ORDER SUMMARY (capture only) */
-  :global(#print-summary-capture #print-summary) {
-    position: fixed;
-    left: -10000px;
-    top: 0;
-    width: 1632px;
-    height: 2112px;
-    background: #fff;
-    box-sizing: border-box;
-    padding: 64px;
-    transform-origin: top left;
-  }
+  /* =========================
+     ORDER SUMMARY (Letter)
+     ========================= */
 
-  :global(#print-summary-capture #print-summary.capture-mode) {
-    width: 1632px;
-    height: 2112px;
-    padding: 64px;
+  /* Force true Letter canvas for summary capture (on-screen off-canvas) */
+  :global(#print-summary.capture-mode),
+  :global(#print-summary-capture.capture-mode) {
+    width: 8.5in;
+    height: 11in;
+    padding: 0.4in;
     box-sizing: border-box;
     background: #fff !important;
-    display: block;
-    transform: none;
-    transform-origin: top left;
+      display: flex;
+  flex-direction: column;
+  justify-content: center;
+  transform: scale(5.5); /* Increase size — try 1.3 to 1.5 */
+  transform-origin: top left;
   }
 
-  :global(#print-summary-capture #print-summary.capture-mode *) {
+  /* Clean rendering inside summary during capture */
+  :global(#print-summary.capture-mode *),
+  :global(#print-summary-capture.capture-mode *) {
     box-shadow: none !important;
     outline: none !important;
   }
 
-  :global(#print-summary-capture #print-summary.capture-mode table),
-  :global(#print-summary-capture #print-summary.capture-mode td),
-  :global(#print-summary-capture #print-summary.capture-mode th) {
+  /* Soften table borders in summary (optional but looks better) */
+  :global(#print-summary.capture-mode table),
+  :global(#print-summary.capture-mode td),
+  :global(#print-summary.capture-mode th),
+  :global(#print-summary-capture.capture-mode table),
+  :global(#print-summary-capture.capture-mode td),
+  :global(#print-summary-capture.capture-mode th) {
     border-color: #d1d5e1 !important;
   }
 
-  :global(#print-summary-capture #print-summary.capture-mode img) { border: none !important; }
+  /* Images in summary: no borders */
+  :global(#print-summary.capture-mode img),
+  :global(#print-summary-capture.capture-mode img) {
+    border: none !important;
+  }
 
-  :global(#print-summary-capture #print-summary.capture-mode :where(
+  
+   :global(#print-summary div) {
+    border: none !important;
+  }
+
+    /* During capture, remove borders/boxes around text elements */
+  :global(#print-summary.capture-mode :where(
     p, span, strong, em, small, label, li, a,
     h1, h2, h3, h4, h5, h6, blockquote
   )) {
@@ -403,13 +396,68 @@ function mountSummaryForCapture(props) {
     background: transparent !important;
   }
 
-  :global(#print-summary-capture #print-summary.capture-mode [class*="ring-"]) { box-shadow: none !important; }
-  :global(#print-summary-capture #print-summary.capture-mode hr) { border-color: #000 !important; }
-  :global(#print-summary-capture #print-summary div) { border: none !important; }
+  /* If you also nuked div borders earlier, keep that too */
+  :global(#print-summary.capture-mode div) {
+    border: none !important;
+  }
+
+  /* Optional: ignore Tailwind rings that can look like borders */
+  :global(#print-summary.capture-mode [class*="ring-"]) {
+    box-shadow: none !important;
+  }
+
+  /* Keep horizontal rules if you use them for separators */
+  :global(#print-summary.capture-mode hr) {
+    border-color: #000 !important; /* or whatever you want to keep */
+  }
+
+#print-summary
+{
+    position: fixed;
+  left: -10000px;
+  top: 0;
+  width: 1632px;   /* Letter width @ 192 DPI */
+  height: 2112px;  /* Letter height @ 192 DPI */
+  background: #fff;
+  box-sizing: border-box;
+  padding: 64px;   /* inner margins */
+  transform-origin: top left;
+}
+
+/* SAFE: Letter-sized capture with no scaling/layout shifts */
+/* keep cleanup rules, but only in capture-mode */
+:global(#print-summary.capture-mode *),
+:global(#print-summary-capture.capture-mode *) {
+  box-shadow: none !important;
+  outline: none !important;
+}
+
+/* optional border softening stays scoped to capture-mode */
+:global(#print-summary.capture-mode table),
+:global(#print-summary.capture-mode td),
+:global(#print-summary.capture-mode th),
+:global(#print-summary-capture.capture-mode table),
+:global(#print-summary-capture.capture-mode td),
+:global(#print-summary-capture.capture-mode th) {
+  border-color: #d1d5e1 !important;
+}
+
+/* don't let this run outside capture-mode! */
+:global(#print-summary.capture-mode img),
+:global(#print-summary-capture.capture-mode img) {
+  border: none !important;
+}
+
+/* 🚫 Remove this global rule or scope it to capture-mode only
+:global(#print-summary div) { border: none !important; }
+*/
+
+
 </style>
 
 
-<div id="fullPage" class="h-520 bg-gradient-to-b from-[rgba(0,0,0,0.6)] via-[rgba(55,65,81,0.5)] to-[rgba(0,0,0,0.6)] p-8">
+<!-- File Upload Input -->
+<div id="fullPage" class="h-550 bg-gradient-to-b from-[rgba(0,0,0,0.6)] via-[rgba(55,65,81,0.5)] to-[rgba(0,0,0,0.6)] p-8">
   <div class="mt-4 no-print flex justify-center border-2 border-[#f58220] w-[65%] bg-white p-4 mx-auto rounded">
     <div class="flex flex-col items-center w-full max-w-sm">
       <label
@@ -440,290 +488,305 @@ function mountSummaryForCapture(props) {
     </div>
   </div>
 
+  <!-- start of form -->
   <div id="print-area">
     <div id="form-wrapper" class="scale-[1.2] origin-top w-[1100px] p-15 mx-auto mt-3 bg-white">
-      <div class="bg-white text-black text-[12px] leading-tight">
 
-        <div class="pt-2 border-b-2 border-black flex justify-between items-center">
-          <img
-            id="logo"
-            src="/BiosculptorFabrications.png"
-            class="h-48 w-auto print:h-[60px] print:pl-0"
-            alt="BioSculptor Logo"
-          />
-          <div class="text-right space-y-1 pr-2">
-            <div class="text-[#f58220] font-bold leading-tight text-2xl" id="print-header-title">
-              Custom Transtibial Socket
-            </div>
-            <div class="text-black font-bold leading-tight text-lg" id="print-header-subtitle">
-              FABRICATION ORDER
-            </div>
-          </div>
+<div class="bg-white text-black text-[12px] leading-tight">
+
+  <div  class="pt-2 border-b-2 border-black flex justify-between items-center">
+  <img
+  id="logo"
+    src="/BiosculptorFabrications.png"
+    class="h-48 w-auto print:h-[60px] print:pl-0"
+    alt="BioSculptor Logo"
+/>
+<div class="text-right space-y-1 pr-2">
+  <div class="text-[#f58220] font-bold leading-tight text-2xl" id="print-header-title">
+    Custom Transtibial Socket
+  </div>
+  <div class="text-black font-bold leading-tight text-lg" id= "print-header-subtitle">
+    FABRICATION ORDER
+  </div>
+</div>
+
+</div>
+
+<div id="print-shrink">
+  <div class="flex justify-end gap-6 text-xl font-bold pt-4">
+    <label class="inline-flex items-center gap-1">
+      <input type="checkbox" class="w-4 h-4" /> Measurements
+    </label>
+    <label class="inline-flex items-center gap-1">
+      <input type="checkbox" class="w-4 h-4" /> Scan
+    </label>
+    <label class="inline-flex items-center gap-1">
+      <input type="checkbox" class="w-4 h-4" /> Cast
+    </label>
+  </div>
+
+  <div class="mt-4 space-y-2 text-sm">
+    <!-- Order Info Row -->
+    <div class="flex justify-end">
+      <div class="border border-gray-400 p-2 w-[14%] h-16 text-center font-bold text-[#f58220]">PATIENT<br />INFORMATION</div>
+    <div class="border border-gray-400 p-2 w-[25%] h-16">
+  <label class="block text-xs font-bold -mt-2 text-[#f58220]">Workorder Number</label>
+<input
+  id="workorderInput"
+  type="text"
+  bind:value={order.workorder}
+  placeholder={data?.workorderHint || 'Assigned on submit'}
+  readonly
+  autocomplete="off"
+  class="w-full h-full font-bold text-2xl"
+/>
+
+
+
+</div>
+      <div class="border border-gray-400 p-2 w-[14%] h-16 text-center font-bold text-[#f58220]">CUSTOMER<br />INFORMATION</div>
+     <div class="border border-gray-400 p-2 w-[16.5%] h-16">
+  <label class="block text-xs font-semibold  -mt-2">Shipping Method</label>
+  <select
+    bind:value={order.shipping}
+    required
+    on:input={checkFormValidity}
+    class={`w-full h-full bg-white text-xs ${errors.shipping ? 'border-2 border-red-500' : ''}`} 
+  >
+    <option value="" disabled selected>Select method</option>
+    <optgroup label="UPS">
+      <option value="UPS Ground">UPS Ground</option>
+      <option value="UPS 2nd Day Air">UPS 2nd Day Air</option>
+      <option value="UPS Next Day Air">UPS Next Day Air</option>
+    </optgroup>
+    <optgroup label="FedEx">
+      <option value="FedEx Ground">FedEx Ground</option>
+      <option value="FedEx Express Saver">FedEx Express Saver</option>
+      <option value="FedEx 2Day">FedEx 2Day</option>
+      <option value="FedEx Standard Overnight">FedEx Standard Overnight</option>
+    </optgroup>
+    <option value="In-Site Pickup">In-Site Pickup</option>
+  </select>
+</div>
+
+<div class="border border-gray-400 p-2 w-[16.5%] h-16">
+  <label class="block text-xs font-semibold -mt-2">Needed Date</label>
+  <input
+    type="date"
+    bind:value={order.neededDate}
+    required
+    on:input={checkFormValidity}
+    class={`w-full h-full ${errors.neededDate ? 'border-2 border-red-500' : ''}`}
+  />
+</div>
+<div class="border border-gray-400 p-2 w-[14%] h-16">
+  <label class="block text-xs font-semibold -mt-2">Received Date</label>
+<input type="text" class="w-[107%]" bind:value={order.receivedDate} />
+
+</div>
+
+
+    </div>
+
+    <!-- Patient Info -->
+   <div class="space-y-1">
+  <div class="flex">
+    <div class="border border-gray-400 p-2 w-[39%] h-12">
+      <label class="block text-xs font-semibold -mt-2">Patient Name</label>
+      <input bind:value={patient.name} required on:input={checkFormValidity} class={`w-full h-full ${errors.name ? 'border-2 border-red-500' : ''}`}  />
+    </div>
+  <div class="border border-gray-400 p-2 w-[33%] h-12">
+  {#if user.facilities?.length}
+    <label class="block text-xs font-semibold -mt-2">Facility</label>
+<select
+  bind:value={patient.facility}
+  class="w-full h-full border border-gray-300 rounded p-1 text-sm"
+  required
+>
+  <option value="" disabled>Select a facility</option>
+  {#each user.facilities as f}
+    <!-- use name as the value, since there's no id in users.json -->
+    <option value={f.name}>{f.name}</option>
+  {/each}
+</select>
+
+  {:else}
+    <p class="text-sm italic text-gray-500">No facilities found</p>
+  {/if}
+</div>
+
+    <div class="border border-gray-400 p-2 w-[28%] h-12">
+      <label class="block text-xs font-semibold -mt-2">Account Number</label>
+      <input bind:value={patient.account} class="w-full h-full" />
+    </div>
+  </div>
+  <div class="flex">
+    <div class="border border-gray-400 p-2 w-[13%] h-12">
+      <label class="block text-xs font-semibold -mt-2">Height</label>
+      <input bind:value={patient.height} class="w-full h-full" />
+    </div>
+    <div class="border border-gray-400 p-2 w-[13%] h-12">
+      <label class="block text-xs font-semibold -mt-2">Weight</label>
+      <input bind:value={patient.weight} class="w-full h-full" />
+    </div>
+    <div class="border border-gray-400 p-2 w-[13%] h-12">
+      <label class="block text-xs font-semibold -mt-2">Age</label>
+      <input bind:value={patient.age} required on:input={checkFormValidity} class="w-full h-full" />
+    </div>
+    <div class="border border-gray-400 p-2 w-[61%] h-12">
+      <label class="block text-xs font-semibold -mt-2">Practitioner</label>
+      <input bind:value={patient.practitioner} required on:input={checkFormValidity} class={`w-full h-full ${errors.practitioner ? 'border-2 border-red-500' : ''}`} />
+    </div>
+  </div>
+  <div class="flex">
+    <div class="border border-gray-400 p-2 w-[13%] h-12">
+      <label class="block text-xs font-semibold -mt-2">Sex</label>
+      <input bind:value={patient.sex} class="w-full h-full" />
+    </div>
+    <div class="border border-gray-400 p-2 w-[13%] h-12">
+      <label class="block text-xs font-semibold -mt-2">Activity Level</label>
+      <input bind:value={patient.activity} required on:input={checkFormValidity} class={`w-full h-full ${errors.activity ? 'border-2 border-red-500' : ''}`} />
+    </div>
+    <div class="border border-gray-400 p-2 w-[13%] h-12">
+      <label class="block text-xs font-semibold -mt-2 text-center">Side</label>
+      <div class="flex gap-2 items-center justify-center">
+        <label class="flex items-center gap-0.5">
+          <input type="checkbox" bind:group={patient.side} value="left" required on:input={checkFormValidity} class={`${errors.side ? 'border-2 border-red-500' : ''}`} />
+          Left
+        </label>
+        <label class="flex items-center gap-0.5">
+          <input type="checkbox" bind:group={patient.side} value="right" required on:input={checkFormValidity} class={` ${errors.side ? 'border-2 border-red-500' : ''}`} />
+          Right
+        </label>
+      </div>
+    </div>
+    <div class="border border-gray-400 p-2 w-[33%] h-12">
+      <label class="block text-xs -mt-2 font-semibold">Email</label>
+      <input bind:value={patient.email} required on:input={checkFormValidity} class={`w-full h-full ${errors.name ? 'border-2 border-red-500' : ''}`}/>
+    </div>
+    <div class="border border-gray-400 p-2 w-[28%] h-12">
+      <label class="block text-xs -mt-2 font-semibold">Phone Number</label>
+      <input bind:value={patient.phone} required on:input={checkFormValidity} class="w-full h-full" />
+    </div>
+  </div>
+</div>
+  </div>
+
+
+  <!-- Materials + Diagram -->
+  <!-- Wrapping container -->
+<div id="materials" class="flex flex-row w-full mt-4 gap-4">
+
+  <!-- Left: Materials & Components -->
+  <div class="w-1/2 pr-2 text-sm space-y-4">
+    <h3 class="text-xl font-bold text-[#f58220]">Materials & Components</h3>
+    <div class="flex flex-col gap-1">
+      {#each ['PP', 'PE', 'FLEXFORM', 'Pelite Cone', 'Acrylic / Duraflex / Dioclear'] as item}
+        <label class="flex items-center gap-2">
+          <input type="checkbox" class="w-4 h-4" /> {item}
+        </label>
+      {/each}
+    </div>
+
+    <div>
+      <h4 class="text-lg font-semibold text-[#f58220]">Liner Type</h4>
+      <div class="pl-2 space-y-1">
+        <div class="flex items-center gap-1">
+          <label class="w-20">Type:</label>
+          <input bind:value={liner.type} class="border-b border-black w-1/2 bg-transparent outline-none text-sm py-0.5" />
         </div>
-
-        <div id="print-shrink">
-          <div class="flex justify-end gap-6 text-xl font-bold pt-4">
-            <label class="inline-flex items-center gap-1">
-              <input type="checkbox" class="w-4 h-4" /> Measurements
-            </label>
-            <label class="inline-flex items-center gap-1">
-              <input type="checkbox" class="w-4 h-4" /> Scan
-            </label>
-            <label class="inline-flex items-center gap-1">
-              <input type="checkbox" class="w-4 h-4" /> Cast
-            </label>
-          </div>
-
-          <div class="mt-4 space-y-2 text-sm">
-            <div class="flex justify-end">
-              <div class="border border-gray-400 p-2 w-[14%] h-16 text-center font-bold text-[#f58220]">PATIENT<br />INFORMATION</div>
-
-              <div class="border border-gray-400 p-2 w-[25%] h-16">
-                <label class="block text-xs font-bold -mt-2 text-[#f58220]">Workorder Number</label>
-                <input
-                  id="workorderInput"
-                  type="text"
-                  bind:value={order.workorder}
-                  placeholder={data?.workorderHint || 'Assigned on submit'}
-                  readonly
-                  autocomplete="off"
-                  class="w-full h-full font-bold text-2xl"
-                />
-              </div>
-
-              <div class="border border-gray-400 p-2 w-[14%] h-16 text-center font-bold text-[#f58220]">CUSTOMER<br />INFORMATION</div>
-
-              <div class="border border-gray-400 p-2 w-[16.5%] h-16">
-                <label class="block text-xs font-semibold -mt-2">Shipping Method</label>
-                <select
-                  bind:value={order.shipping}
-                  required
-                  on:input={checkFormValidity}
-                  class={`w-full h-full bg-white text-xs ${errors.shipping ? 'border-2 border-red-500' : ''}`}
-                >
-                  <option value="" disabled selected>Select method</option>
-                  <optgroup label="UPS">
-                    <option value="UPS Ground">UPS Ground</option>
-                    <option value="UPS 2nd Day Air">UPS 2nd Day Air</option>
-                    <option value="UPS Next Day Air">UPS Next Day Air</option>
-                  </optgroup>
-                  <optgroup label="FedEx">
-                    <option value="FedEx Ground">FedEx Ground</option>
-                    <option value="FedEx Express Saver">FedEx Express Saver</option>
-                    <option value="FedEx 2Day">FedEx 2Day</option>
-                    <option value="FedEx Standard Overnight">FedEx Standard Overnight</option>
-                  </optgroup>
-                  <option value="In-Site Pickup">In-Site Pickup</option>
-                </select>
-              </div>
-
-              <div class="border border-gray-400 p-2 w-[16.5%] h-16">
-                <label class="block text-xs font-semibold -mt-2">Needed Date</label>
-                <input
-                  type="date"
-                  bind:value={order.neededDate}
-                  required
-                  on:input={checkFormValidity}
-                  class={`w-full h-full ${errors.neededDate ? 'border-2 border-red-500' : ''}`}
-                />
-              </div>
-
-              <div class="border border-gray-400 p-2 w-[14%] h-16">
-                <label class="block text-xs font-semibold -mt-2">Received Date</label>
-                <input type="text" class="w-[107%]" bind:value={order.receivedDate} />
-              </div>
-            </div>
-
-            <div class="space-y-1">
-              <div class="flex">
-                <div class="border border-gray-400 p-2 w-[39%] h-12">
-                  <label class="block text-xs font-semibold -mt-2">Patient Name</label>
-                  <input bind:value={patient.name} required on:input={checkFormValidity} class={`w-full h-full ${errors.name ? 'border-2 border-red-500' : ''}`}  />
-                </div>
-
-                <div class="border border-gray-400 p-2 w-[33%] h-12">
-                  {#if user.facilities?.length}
-                    <label class="block text-xs font-semibold -mt-2">Facility</label>
-                    <select
-                      bind:value={patient.facility}
-                      class="w-full h-full border border-gray-300 rounded p-1 text-sm"
-                      required
-                    >
-                      <option value="" disabled>Select a facility</option>
-                      {#each user.facilities as f}
-                        <option value={f.name}>{f.name}</option>
-                      {/each}
-                    </select>
-                  {:else}
-                    <p class="text-sm italic text-gray-500">No facilities found</p>
-                  {/if}
-                </div>
-
-                <div class="border border-gray-400 p-2 w-[28%] h-12">
-                  <label class="block text-xs font-semibold -mt-2">Account Number</label>
-                  <input bind:value={patient.account} class="w-full h-full" />
-                </div>
-              </div>
-
-              <div class="flex">
-                <div class="border border-gray-400 p-2 w-[13%] h-12">
-                  <label class="block text-xs font-semibold -mt-2">Height</label>
-                  <input bind:value={patient.height} class="w-full h-full" />
-                </div>
-                <div class="border border-gray-400 p-2 w-[13%] h-12">
-                  <label class="block text-xs font-semibold -mt-2">Weight</label>
-                  <input bind:value={patient.weight} class="w-full h-full" />
-                </div>
-                <div class="border border-gray-400 p-2 w-[13%] h-12">
-                  <label class="block text-xs font-semibold -mt-2">Age</label>
-                  <input bind:value={patient.age} required on:input={checkFormValidity} class="w-full h-full" />
-                </div>
-                <div class="border border-gray-400 p-2 w-[61%] h-12">
-                  <label class="block text-xs font-semibold -mt-2">Practitioner</label>
-                  <input bind:value={patient.practitioner} required on:input={checkFormValidity} class={`w-full h-full ${errors.practitioner ? 'border-2 border-red-500' : ''}`} />
-                </div>
-              </div>
-
-              <div class="flex">
-                <div class="border border-gray-400 p-2 w-[13%] h-12">
-                  <label class="block text-xs font-semibold -mt-2">Sex</label>
-                  <input bind:value={patient.sex} class="w-full h-full" />
-                </div>
-                <div class="border border-gray-400 p-2 w-[13%] h-12">
-                  <label class="block text-xs font-semibold -mt-2">Activity Level</label>
-                  <input bind:value={patient.activity} required on:input={checkFormValidity} class={`w-full h-full ${errors.activity ? 'border-2 border-red-500' : ''}`} />
-                </div>
-                <div class="border border-gray-400 p-2 w-[13%] h-12">
-                  <label class="block text-xs font-semibold -mt-2 text-center">Side</label>
-                  <div class="flex gap-2 items-center justify-center">
-                    <label class="flex items-center gap-0.5">
-                      <input type="checkbox" bind:group={patient.side} value="left" on:input={checkFormValidity} class={`${errors.side ? 'border-2 border-red-500' : ''}`} />
-                      Left
-                    </label>
-                    <label class="flex items-center gap-0.5">
-                      <input type="checkbox" bind:group={patient.side} value="right" on:input={checkFormValidity} class={`${errors.side ? 'border-2 border-red-500' : ''}`} />
-                      Right
-                    </label>
-                  </div>
-                </div>
-                <div class="border border-gray-400 p-2 w-[33%] h-12">
-                  <label class="block text-xs -mt-2 font-semibold">Email</label>
-                  <input bind:value={patient.email} required on:input={checkFormValidity} class={`w-full h-full ${errors.name ? 'border-2 border-red-500' : ''}`}/>
-                </div>
-                <div class="border border-gray-400 p-2 w-[28%] h-12">
-                  <label class="block text-xs -mt-2 font-semibold">Phone Number</label>
-                  <input bind:value={patient.phone} required on:input={checkFormValidity} class="w-full h-full" />
-                </div>
-              </div>
-            </div>
-          </div>
+        <div class="flex items-center gap-1">
+          <label class="w-20">Size:</label>
+          <input bind:value={liner.size} class="border-b border-black w-1/2 bg-transparent outline-none text-sm py-0.5" />
         </div>
-
-        <div id="materials" class="flex flex-row w-full mt-4 gap-4">
-          <div class="w-1/2 pr-2 text-sm space-y-4">
-            <h3 class="text-xl font-bold text-[#f58220]">Materials & Components</h3>
-            <div class="flex flex-col gap-1">
-              {#each ['PP', 'PE', 'FLEXFORM', 'Pelite Cone', 'Acrylic / Duraflex / Dioclear'] as item}
-                <label class="flex items-center gap-2">
-                  <input type="checkbox" class="w-4 h-4" /> {item}
-                </label>
-              {/each}
-            </div>
-
-            <div>
-              <h4 class="text-lg font-semibold text-[#f58220]">Liner Type</h4>
-              <div class="pl-2 space-y-1">
-                <div class="flex items-center gap-1">
-                  <label class="w-20">Type:</label>
-                  <input bind:value={liner.type} class="border-b border-black w-1/2 bg-transparent outline-none text-sm py-0.5" />
-                </div>
-                <div class="flex items-center gap-1">
-                  <label class="w-20">Size:</label>
-                  <input bind:value={liner.size} class="border-b border-black w-1/2 bg-transparent outline-none text-sm py-0.5" />
-                </div>
-                <div class="flex items-center gap-1">
-                  <label class="w-20">Thickness:</label>
-                  <input bind:value={liner.thickness} class="border-b border-black w-1/2 bg-transparent outline-none text-sm py-0.5" />
-                </div>
-              </div>
-            </div>
-
-            <div>
-              <h4 class="text-lg font-semibold text-[#f58220]">Suspension</h4>
-              {#each ['Section', 'Pin Lock Type', 'Silicone Valve Sleeve'] as s}
-                <label class="flex items-center gap-2"><input type="checkbox" class="w-4 h-4" /> {s}</label>
-              {/each}
-            </div>
-
-            <div>
-              <h4 class="text-lg font-semibold text-[#f58220]">Distal End</h4>
-              {#each ['Fitted', 'Injection Void', 'Injection Kit'] as s}
-                <label class="flex items-center gap-2"><input type="checkbox" class="w-4 h-4" /> {s}</label>
-              {/each}
-            </div>
-
-            <div>
-              <h4 class="text-lg font-semibold text-[#f58220]">Foot</h4>
-              <div class="pl-2 space-y-1">
-                <div class="flex items-center gap-1">
-                  <label class="w-12">Type:</label>
-                  <input bind:value={foot.type} class="border-b border-black w-1/2 bg-transparent outline-none text-sm py-0.5" />
-                </div>
-                <div class="flex items-center gap-1">
-                  <label class="w-12">Size:</label>
-                  <input bind:value={foot.size} class="border-b border-black w-1/2 bg-transparent outline-none text-sm py-0.5" />
-                </div>
-              </div>
-            </div>
-          </div>
-
-          <div id="diagram" class="w-1/2 relative flex flex-col items-center justify-start">
-            <div class="relative w-full flex justify-center">
-              <img src="/transtibialDiagram.png" alt="Socket Diagram" class="h-[650px] object-contain z-0" />
-              <input id="measurementB" type="text" class="absolute top-[37%] left-[7%] w-16 h-8 border font-bold text-center text-sm" />
-              <input id="measurementD" type="text" class="absolute top-[33.5%] left-[75.5%] w-16 h-8 border font-bold text-center text-sm" />
-              <input id="measurementA" type="text" class="absolute top-[55%] left-[24%] w-16 h-8 border font-bold text-center text-sm" />
-            </div>
-
-            <div id="legend" class="text-center text-xs pt-2">
-              a. SC ML<br />
-              b. Femoral Condyle ML<br />
-              c. Depth of Medial Flare<br />
-              d. MPT to Distal<br />
-              <strong>IF LINER IS TO BE USED, MEASUREMENTS ARE TAKEN OVER LINER.</strong>
-            </div>
-          </div>
-        </div>
-
-        <div class="mt-4" id="notes">
-          <h3 class="text-2xl font-bold text-[#f58220] border-b pb-1">Notes and Modification Instructions</h3>
-          <div class="border border-dashed border-gray-400 h-24 p-2 mt-1 text-sm">
-            <textarea
-              rows="4"
-              placeholder="Enter notes or modification instructions here..."
-              bind:value={order.comment}
-              class="w-full h-full resize-none outline-none bg-transparent"
-            />
-          </div>
+        <div class="flex items-center gap-1">
+          <label class="w-20">Thickness:</label>
+          <input bind:value={liner.thickness} class="border-b border-black w-1/2 bg-transparent outline-none text-sm py-0.5" />
         </div>
       </div>
     </div>
 
-<!-- Wrap the footer in no-capture so it never gets hidden by the snapshot helper -->
-<div class="text-center text-lg mt-4 no-capture">
+    <div>
+      <h4 class="text-lg font-semibold text-[#f58220]">Suspension</h4>
+      {#each ['Section', 'Pin Lock Type', 'Silicone Valve Sleeve'] as s}
+        <label class="flex items-center gap-2"><input type="checkbox" class="w-4 h-4" /> {s}</label>
+      {/each}
+    </div>
 
-  <p class="mt-2 text-sm">
-    2480 West 82nd Street | Hialeah, FL 33016 | 305.823.8300 | 877.246.2884 | www.biosculptor.com
-  </p>
+    <div>
+      <h4 class="text-lg font-semibold text-[#f58220]">Distal End</h4>
+      {#each ['Fitted', 'Injection Void', 'Injection Kit'] as s}
+        <label class="flex items-center gap-2"><input type="checkbox" class="w-4 h-4" /> {s}</label>
+      {/each}
+    </div>
+
+    <div>
+      <h4 class="text-lg font-semibold text-[#f58220]">Foot</h4>
+      <div class="pl-2 space-y-1">
+        <div class="flex items-center gap-1">
+          <label class="w-12">Type:</label>
+          <input bind:value={foot.type} class="border-b border-black w-1/2 bg-transparent outline-none text-sm py-0.5" />
+        </div>
+        <div class="flex items-center gap-1">
+          <label class="w-12">Size:</label>
+          <input bind:value={foot.size} class="border-b border-black w-1/2 bg-transparent outline-none text-sm py-0.5" />
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Right: Diagram -->
+  <div id="diagram" class="w-1/2 relative flex flex-col items-center justify-start">
+    <div class="relative w-full flex justify-center">
+      <img src="/transtibialDiagram.png" alt="Socket Diagram" class="h-[650px] object-contain z-0" />
+      <input id="measurementB" type="text" class="absolute top-[37%] left-[7%] w-16 h-8 border font-bold text-center text-sm" placeholder="" />
+      <input id="measurementD" type="text" class="absolute top-[33.5%] left-[75.5%] w-16 h-8 border font-bold text-center text-sm" placeholder="" />
+      <input id="measurementA" type="text" class="absolute top-[55%] left-[24%] w-16 h-8 border font-bold text-center text-sm" placeholder="" />
+    </div>
+
+    <div id="legend" class="text-center text-xs pt-2">
+      a. SC ML<br />
+      b. Femoral Condyle ML<br />
+      c. Depth of Medial Flare<br />
+      d. MPT to Distal<br />
+      <strong>IF LINER IS TO BE USED, MEASUREMENTS ARE TAKEN OVER LINER.</strong>
+    </div>
+  </div>
 </div>
+ <!-- Notes Section -->
+  <div class="mt-4" id="notes">
+    <h3 class="text-2xl font-bold text-[#f58220] border-b pb-1">Notes and Modification Instructions</h3>
+    <div class="border border-dashed border-gray-400 h-24 p-2 mt-1 text-sm">
+      <textarea
+  rows="4"
+  placeholder="Enter notes or modification instructions here..."
+  bind:value={order.comment}
+  class="w-full h-full resize-none outline-none bg-transparent"
+/>
+    </div>
   </div>
-</div> 
- <div id="submitButton" class="text-center mt-6">
-    <button
-      type="button"
-      on:click={handleSubmit}
-      class="bg-[#f58220] text-white font-bold py-2 px-6 rounded hover:bg-[#e4711a] transition"
-    >
-      Submit Order
-    </button>
+</div>
+   <!-- Footer -->
+      <div class="text-center text-lg mt-4">
+        <div id="submitButton" class="text-center mt-6">
+          <button
+            type="button"
+            on:click={handleSubmit}
+            class="bg-[#f58220] text-white font-bold py-2 px-6 rounded hover:bg-[#e4711a] transition"
+          >
+            Submit Order
+          </button>
+        </div>
+        <p class="mt-2 text-sm">
+          2480 West 82nd Street | Hialeah, FL 33016 | 305.823.8300 | 877.246.2884 | www.biosculptor.com
+        </p>
+      </div>
+    </div>
   </div>
+</div>
+
+<!-- Hidden print summary -->
+<div id="print-summary">
+  <PrintOrderSummary  uploadedFileName={uploadedFileName} />
+</div>
+</div>

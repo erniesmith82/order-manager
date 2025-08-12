@@ -80,49 +80,40 @@
     city: has(rawFD.shipCity) ? rawFD.shipCity : bill.city,
     state: has(rawFD.shipState) ? rawFD.shipState : bill.state,
     zip: has(rawFD.shipZip) ? rawFD.shipZip : bill.zip,
-    contactEmail: bill.contactEmail // or a separate ship email field if you add one
+    contactEmail: bill.contactEmail 
   };
 
   // Expose formatted strings the template already uses
   $: billCityLine = joinAddress([bill.city, bill.state, bill.zip]);
   $: shipCityLine = joinAddress([ship.city, ship.state, ship.zip]);
 
-  // If you ever feed ISO dates, you can pretty-print them here
-  // const prettyDate = (d) => fmt(d); // placeholder if needed later
+
 </script>
 
 
 <style>
-  /* dom-to-image reads live DOM; lock summary to Letter size here */
-  #print-summary {
-    width: 8.5in;
-    min-height: 11in;
-    padding: 0.5in;
-    box-sizing: border-box;
-    margin: 0 auto;
-    overflow: hidden;
-    font-family: ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto,
-      "Helvetica Neue", Arial, "Noto Sans", "Liberation Sans", sans-serif;
-  }
 
-  /* Your original print rules kept in case you actually print via browser */
-  @media print {
-    @page { size: 8.5in 11in; margin: 0.5in; }
-    html, body { margin: 0; padding: 0; width: 100%; height: 100%; }
-    .print-container { width: 100%; height: 100%; box-sizing: border-box; padding: 0; margin: 0; page-break-after: always; }
-    body * { visibility: hidden; }
-    #print-summary, #print-summary * { visibility: visible; }
-    #print-summary { position: absolute; top: 0; left: 0; }
-  }
+ #print-summary {
+  width: 8.5in;         /* full width */
+  height: 11in;         /* fixed height (not max-height) */
+  padding: 0.5in;       /* page margins inside the sheet */
+  box-sizing: border-box;
+  margin: 0 auto;
+  overflow: hidden;
+  background: #fff;
+  font-family: ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto,
+    "Helvetica Neue", Arial, "Noto Sans", "Liberation Sans", sans-serif;
+}
+
 </style>
 
-<div class="border p-10">
-  <div id="print-summary" class="print-container bg-white text-black text-sm leading-tight">
+<div class="flex items-center justify-center min-h-screen border">
+  <div id="print-summary" class="print-container bg-white text-black text-[12pt] leading-normal left-0">
 
     <!-- Header -->
-    <div class="header pb-10 text-2xl font-bold">
-      Order Summary
-    </div>
+<div class="header pb-10 text-2xl font-bold text-center mx-auto">
+  Order Summary
+</div>
 
     <!-- Top row -->
     <div class="flex justify-between border-b-2 pb-10 pt-1 mb-4">

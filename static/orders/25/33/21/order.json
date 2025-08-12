@@ -1,0 +1,53 @@
+{
+  "workorder": "25330021",
+  "YY": "25",
+  "WW": "33",
+  "NN": "21",
+  "createdAt": "2025-08-12T00:00:00.000Z",
+  "patient": {
+    "name": "sh",
+    "facility": "BGRN Industries",
+    "facilityDetails": {
+      "name": "BGRN Industries",
+      "address": "4505 NW 165 ST",
+      "city": "OPA LOCKA ",
+      "state": "FL ",
+      "zip": "33054"
+    },
+    "account": "h",
+    "height": "h",
+    "weight": "h",
+    "age": "h",
+    "practitioner": "h",
+    "sex": "h",
+    "activity": "h",
+    "side": [
+      "left"
+    ],
+    "email": "h",
+    "phone": "s"
+  },
+  "order": {
+    "workorder": "25330021",
+    "receivedDate": "08/12/2025",
+    "shipping": "FedEx Standard Overnight",
+    "neededDate": "2025-08-21",
+    "uploadedFileName": "prosthetic.png",
+    "product": "Transtibial Socket",
+    "comment": ""
+  },
+  "liner": {
+    "type": "",
+    "size": "",
+    "thickness": ""
+  },
+  "foot": {
+    "type": "",
+    "size": ""
+  },
+  "files": {
+    "uploadedFile": "prosthetic.png",
+    "jpg": "workorder.jpg",
+    "summaryJpg": "order-summary.jpg"
+  }
+}
