@@ -1,6 +1,8 @@
 <script>
+  // (kept for compatibility; currently unused in this component)
   export let showPrintClean = true;
 
+  // ---- Incoming props (same shape you posted) ----
   export let order = {
     workorder: '',
     neededDate: '',
@@ -10,7 +12,10 @@
     uploadedFileName: '',
     customerPO: '',
     type: 'Standard',
-    quantity: '1'
+    quantity: '1',
+    // These might be added later; we handle missing gracefully
+    shipDate: '',
+    deliveryDate: ''
   };
 
   export let patient = {
@@ -26,25 +31,66 @@
     zip: ''
   };
 
+  // Provided separately by the page during upload; we’ll prefer order.uploadedFileName if set
   export let uploadedFileName = '';
 
-  const fmt = (v) => (v ?? '') || '—';
+  // ---------- Helpers ----------
+  const clean = (v) => (typeof v === 'string' ? v.trim() : v);
+  const has = (v) => {
+    const x = clean(v);
+    return !(x === undefined || x === null || x === '');
+  };
+  const fmt = (v) => (has(v) ? String(clean(v)) : '—');
 
-  // Safe derived facility object: uses facilityDetails when present, else patient fields
-  $: fd = patient.facilityDetails ?? {
-    name: patient.facility || '',
+  const joinAddress = (parts) =>
+    parts
+      .map((p) => (has(p) ? String(clean(p)) : ''))
+      .filter(Boolean)
+      .join(', ') || '—';
+
+  // Prefer file name from order, else the separate prop
+  $: fileName = has(order.uploadedFileName) ? order.uploadedFileName : uploadedFileName;
+
+  // Build a robust facility object:
+  //  - Start with patient’s own fields (bill-to baseline)
+  //  - Overlay facilityDetails if present
+  //  - Ensure ship-to fields fall back to bill-to when missing
+  $: baseBill = {
+    name: patient.facility || patient.name || '',
     address: patient.address || '',
     city: patient.city || '',
     state: patient.state || '',
     zip: patient.zip || '',
-    contactEmail: patient.email || '',
-    shipName: '',
-    shipAddress: '',
-    shipCity: '',
-    shipState: '',
-    shipZip: ''
+    contactEmail: patient.email || ''
   };
+
+  $: rawFD = patient.facilityDetails ?? {};
+  $: bill = {
+    name: rawFD.name ?? baseBill.name,
+    address: rawFD.address ?? baseBill.address,
+    city: rawFD.city ?? baseBill.city,
+    state: rawFD.state ?? baseBill.state,
+    zip: rawFD.zip ?? baseBill.zip,
+    contactEmail: rawFD.contactEmail ?? baseBill.contactEmail
+  };
+
+  $: ship = {
+    name: has(rawFD.shipName) ? rawFD.shipName : bill.name,
+    address: has(rawFD.shipAddress) ? rawFD.shipAddress : bill.address,
+    city: has(rawFD.shipCity) ? rawFD.shipCity : bill.city,
+    state: has(rawFD.shipState) ? rawFD.shipState : bill.state,
+    zip: has(rawFD.shipZip) ? rawFD.shipZip : bill.zip,
+    contactEmail: bill.contactEmail // or a separate ship email field if you add one
+  };
+
+  // Expose formatted strings the template already uses
+  $: billCityLine = joinAddress([bill.city, bill.state, bill.zip]);
+  $: shipCityLine = joinAddress([ship.city, ship.state, ship.zip]);
+
+  // If you ever feed ISO dates, you can pretty-print them here
+  // const prettyDate = (d) => fmt(d); // placeholder if needed later
 </script>
+
 
 <style>
   /* dom-to-image reads live DOM; lock summary to Letter size here */
@@ -135,12 +181,11 @@
         <div class="flex items-start gap-4">
           <strong class="min-w-[80px]">Bill to:</strong>
           <div class="leading-tight">
-            <p>{fmt(fd.name)}</p>
-            <p>{fmt(fd.address)}</p>
-            <p>{[fmt(fd.city), fmt(fd.state), fmt(fd.zip)]
-              .filter(s => s && s !== '—')
-              .join(', ') || '—'}</p>
-            <p>{fmt(fd.contactEmail || patient.email)}</p>
+           <p>{fmt(bill.name)}</p>
+<p>{fmt(bill.address)}</p>
+<p>{billCityLine}</p>
+<p>{fmt(bill.contactEmail)}</p>
+
           </div>
         </div>
       </div>
@@ -150,12 +195,11 @@
         <div class="flex items-start gap-4">
           <strong class="min-w-[80px]">Ship to:</strong>
           <div class="leading-tight">
-            <p>{fmt(fd.shipName || fd.name)}</p>
-            <p>{fmt(fd.shipAddress || fd.address)}</p>
-            <p>{[fmt(fd.shipCity || fd.city), fmt(fd.shipState || fd.state), fmt(fd.shipZip || fd.zip)]
-              .filter(s => s && s !== '—')
-              .join(', ') || '—'}</p>
-            <p>{fmt(fd.contactEmail || patient.email)}</p>
+           <p>{fmt(ship.name)}</p>
+<p>{fmt(ship.address)}</p>
+<p>{shipCityLine}</p>
+<p>{fmt(ship.contactEmail)}</p>
+
           </div>
         </div>
       </div>
@@ -176,7 +220,8 @@
     <!-- Files -->
     <div class="border-b-2 pb-10 pt-5 mb-4 text-left">
       <p><strong>Order Form:</strong></p>
-      <p><strong>Order File:</strong> {fmt(order.uploadedFileName || uploadedFileName)}</p>
+      <p><strong>Order File:</strong> {fmt(fileName)}</p>
+
     </div>
 
     <!-- Comment -->
